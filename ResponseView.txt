@@ -1,0 +1,52 @@
+import React from 'react';
+import Markdown from 'react-markdown';
+import { Node } from '@root/types/interaction';
+import {
+  ContentType,
+  TextResponseNode
+} from '../../../types/api';
+import { DivformattedContent } from '../Content';
+import { TableView } from '../TableView/TableView';
+import { KnowledgeDiscoveryView } from '../KnowledgeDiscoveryView/KnowledgeDiscoveryView';
+import { useChatRD } from '../../../context/chatrd';
+
+
+interface ResponseViewProps {
+  data: Node[];
+  interactionId:string;
+}
+
+export const ResponseView: React.FC<ResponseViewProps> = ({ data,interactionId }) => {
+  const { chatHistory } = useChatRD();
+  const dataType = data?.map(
+    (value: Node, id) => {
+      switch (value.type) {
+        case ContentType.Table:
+          return {
+            element: <TableView key={id} interactionId={interactionId} columns={value.columns} rows={value.rows} /> ,
+          };
+        case ContentType.KnowledgeDiscovery:
+          return {
+            element: (
+              <KnowledgeDiscoveryView key={id} answer={value.answer} documents={value.documents} />
+            ),
+          };
+        default:
+          let ans = '' ;
+          
+          if(sessionStorage.getItem('EventStream') == '1' && chatHistory !== 'History') { ans = value.content as string} else { ans = (value as TextResponseNode).answer}
+          return { 
+            //element: <DivformattedContent key={id}>
+              //{value.content}
+          // </DivformattedContent>,
+           element: <DivformattedContent key={id}>
+              <Markdown source={ans} escapeHtml></Markdown>
+           </DivformattedContent>,
+           //element: <DivformattedContent key={id}>{value.answer}</DivformattedContent>,
+          }
+      }
+    }
+  );
+
+  return <>{dataType.map((item) => item.element)}</>;
+};

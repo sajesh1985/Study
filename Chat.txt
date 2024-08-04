@@ -1,0 +1,260 @@
+import React from 'react';
+import { Button, H2, H4, P } from '@spglobal/react-components';
+
+import { useChatRD } from '../../context/chatrd';
+import { Interaction } from '../../types/interaction';
+import { ChatMessage } from './ChatMessage/ChatMessage';
+import { Page } from '../_common/Page/Page';
+import { QuestionInput } from '../_common/QuestionInput/QuestionInput';
+import { Timeline } from './Chat.styles';
+import {
+  ExampleBoxWrapper,
+  FaqDesclimer,
+  Status,
+  Header,
+  ChatRDModel,
+  Suggestions,
+  SuggestionsChip,
+  NewContent,
+  Title
+} from '../Landing/Landing.styles';
+import { Purpose, Size } from '@spglobal/koi-helpers';
+import { Logo } from '../_common/Logo/Logo';
+import { ChatHomeSlider } from './ChatHomeSlider';
+import { LandingSlider } from '../Landing/LandingSlider';
+export const Chat: React.FC = () => {
+  const { interactions, newInteraction, isLoading,chatHistory,askQuestion } = useChatRD();
+  const [dValue, setDValue] = React.useState<string>('');
+  const myRef = React.useRef<HTMLInputElement>(null);
+  //const topElementRef = React.useRef(null);
+  //const bottomElementRef = React.useRef(null);
+  
+  const addQuestion = (
+    fullQuestion: string,
+    startSubQuestion?: number,
+    endSubQuestion?: number
+  ) => {
+    document.body.classList.add('focuseTemp');
+    const input = myRef?.current;
+    setDValue(fullQuestion);
+    setTimeout(() => {
+      input.focus();
+      startSubQuestion &&
+        endSubQuestion &&
+        input.setSelectionRange(startSubQuestion, endSubQuestion);
+    }, 2000);
+
+    setTimeout(() => document.body.classList.remove('focuseTemp'), 3000);
+  };
+
+  const children = React.useMemo(() => {
+   interactions.map((interaction: Interaction) => (
+    <>
+      {interaction && <ChatMessage key={interaction.id} interaction={interaction} />}
+    </>
+  ));
+  },[interactions]);
+
+  React.useLayoutEffect(() => {
+    setTimeout(
+      () =>{
+        interactions.length > 0 
+        //scrollToBottomRef?.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        },
+      700
+    );
+  }, [isLoading, interactions.length]);
+
+  React.useEffect(() => {
+    if(interactions.length > 0)
+    {
+      if(chatHistory == "New")
+      {
+        setDValue('');
+      }
+      else if(chatHistory == "History")
+      {
+        setDValue(interactions[0].req.toString());
+      }
+      else if(chatHistory == "Existing")
+      {
+        setDValue(interactions[interactions.length-1].req.toString());
+      }
+    }
+  },[isLoading, interactions.length]);
+
+  const footer = (
+    <>
+    { sessionStorage.getItem('EventStream') == '1' &&  <QuestionInput
+      onSearch={askQuestion}
+      onSearchValueUpdate={(searchText) => setDValue(searchText)}
+      ref={myRef}
+      domUpdateValue={dValue}
+    />}
+    { sessionStorage.getItem('EventStream') == '0' &&  <QuestionInput
+      onSearch={newInteraction}
+      onSearchValueUpdate={(searchText) => setDValue(searchText)}
+      ref={myRef}
+      domUpdateValue={dValue}
+    />}
+    </>
+  );
+  
+  const [howToUse, setHowToUse] = React.useState<boolean>(false);
+  //const { t } = useTranslation(['chatiq_main']);
+  const ExampleQuestions = (
+    <>
+    
+      <Header>
+        <Logo />
+        <Status>STATUS: IN TRAINING</Status>
+        <Title>Here are some ways I can help you today:</Title>
+      </Header>
+      <ExampleBoxWrapper>
+        <ChatHomeSlider clicked={addQuestion}/>
+      </ExampleBoxWrapper>
+      <FaqDesclimer>
+        <Button
+          size={Size.MEDIUM}
+          purpose={Purpose.LINK}
+          onClick={() => setHowToUse(true)}
+          leftIcon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="19"
+              viewBox="0 0 14 19"
+              fill="none"
+            >
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M0 0H10.9767V7.61783C10.9767 7.913 10.7374 8.15229 10.4423 8.15229C10.1471 8.15229 9.90779 7.913 9.90779 7.61783V1.06893H1.06893V14.8077H2.91527C3.21045 14.8077 3.44974 15.047 3.44974 15.3422C3.44974 15.6374 3.21045 15.8766 2.91527 15.8766H0V0Z"
+                fill="var(--color-text-link)"
+              />
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M2.36841 3.12473C2.36841 2.82956 2.6077 2.59027 2.90287 2.59027H8.07392C8.36909 2.59027 8.60838 2.82956 8.60838 3.12473C8.60838 3.41991 8.36909 3.6592 8.07392 3.6592H2.90287C2.6077 3.6592 2.36841 3.41991 2.36841 3.12473ZM2.36841 5.45598C2.36841 5.1608 2.6077 4.92151 2.90287 4.92151H8.07392C8.36909 4.92151 8.60838 5.1608 8.60838 5.45598C8.60838 5.75115 8.36909 5.99044 8.07392 5.99044H2.90287C2.6077 5.99044 2.36841 5.75115 2.36841 5.45598ZM2.36841 7.78722C2.36841 7.49204 2.6077 7.25275 2.90287 7.25275H8.07392C8.36909 7.25275 8.60838 7.49204 8.60838 7.78722C8.60838 8.0824 8.36909 8.32168 8.07392 8.32168H2.90287C2.6077 8.32168 2.36841 8.0824 2.36841 7.78722ZM2.36841 10.14C2.36841 9.84487 2.6077 9.60558 2.90287 9.60558H4.59626C4.89143 9.60558 5.13072 9.84487 5.13072 10.14C5.13072 10.4352 4.89143 10.6745 4.59626 10.6745H2.90287C2.6077 10.6745 2.36841 10.4352 2.36841 10.14Z"
+                fill="var(--color-text-link)"
+              />
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M9.15357 17.3441C10.9949 17.3441 12.4876 15.8514 12.4876 14.0101C12.4876 12.1688 10.9949 10.6761 9.15357 10.6761C7.31224 10.6761 5.81955 12.1688 5.81955 14.0101C5.81955 15.8514 7.31224 17.3441 9.15357 17.3441ZM9.15357 18.475C11.6194 18.475 13.6184 16.476 13.6184 14.0101C13.6184 11.5442 11.6194 9.54525 9.15357 9.54525C6.6877 9.54525 4.68872 11.5442 4.68872 14.0101C4.68872 16.476 6.6877 18.475 9.15357 18.475Z"
+                fill="var(--color-text-link)"
+              />
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M9.15394 13.1362C9.47717 13.1362 9.73921 13.3983 9.73921 13.7215V15.755C9.73921 16.0782 9.47717 16.3403 9.15394 16.3403C8.8307 16.3403 8.56866 16.0782 8.56866 15.755V13.7215C8.56866 13.3983 8.8307 13.1362 9.15394 13.1362Z"
+                fill="var(--color-text-link)"
+              />
+              <path
+                d="M9.7389 12.2652C9.7389 12.5884 9.47687 12.8504 9.15363 12.8504C8.83039 12.8504 8.56836 12.5884 8.56836 12.2652C8.56836 11.9419 8.83039 11.6799 9.15363 11.6799C9.47687 11.6799 9.7389 11.9419 9.7389 12.2652Z"
+                fill="var(--color-text-link)"
+              />
+            </svg>
+          }
+        >
+          How to use ChatRD
+        </Button>
+        <Button
+          size={Size.MEDIUM}
+          purpose={Purpose.LINK}
+          onClick={() => newInteraction('ChatRD Legal Disclaimer')}
+          leftIcon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="15"
+              height="15"
+              viewBox="0 0 15 15"
+              fill="none"
+            >
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M7.0786 12.7858C9.99786 12.7858 12.3644 10.4192 12.3644 7.49999C12.3644 4.58073 9.99786 2.21421 7.0786 2.21421C4.15935 2.21421 1.79282 4.58073 1.79282 7.49999C1.79282 10.4192 4.15935 12.7858 7.0786 12.7858ZM7.0786 14.5786C10.988 14.5786 14.1572 11.4094 14.1572 7.49999C14.1572 3.59059 10.988 0.421387 7.0786 0.421387C3.1692 0.421387 0 3.59059 0 7.49999C0 11.4094 3.1692 14.5786 7.0786 14.5786ZM7.07904 6.11451C7.5915 6.11451 8.00693 6.52994 8.00693 7.0424V10.2663C8.00693 10.7788 7.5915 11.1942 7.07904 11.1942C6.56658 11.1942 6.15115 10.7788 6.15115 10.2663V7.0424C6.15115 6.52994 6.56658 6.11451 7.07904 6.11451ZM7.07871 5.66144C7.59117 5.66144 8.0066 5.246 8.0066 4.73354C8.0066 4.22108 7.59117 3.80565 7.07871 3.80565C6.56625 3.80565 6.15082 4.22108 6.15082 4.73354C6.15082 5.246 6.56625 5.66144 7.07871 5.66144Z"
+                fill="var(--color-text-link)"
+              />
+            </svg>
+          }
+        >
+          Legal disclaimer
+        </Button>
+      </FaqDesclimer>
+    </>
+  );
+
+  const HowToUseChatRD = (
+    <NewContent>
+      <div>
+        <Logo leftAligned={true} onClick={() => setHowToUse(false)} />
+        <H2 className="spg-mt-xl">
+	 A generative AI chatbot powered by S&P Global Ratings <br/> data and research from S&P Global Market Intelligence. 
+        </H2>
+        <LandingSlider />
+      </div>
+      <div>
+        <H2>Try a Suggestion</H2>
+        <Suggestions>
+          <SuggestionsChip
+            onClick={() => addQuestion("What's the most recent action for Apple?")}
+          >
+            What's the most recent action for Apple?
+          </SuggestionsChip>
+          <SuggestionsChip
+            onClick={() => addQuestion('What ratings criteria is applied to Exxon?')}
+          >
+            What ratings criteria is applied to Exxon?
+          </SuggestionsChip>
+          <SuggestionsChip onClick={() => addQuestion('Show me the latest S&P Research on Aerospace')}>
+            Show me the latest S&P Research on Aerospace
+          </SuggestionsChip>
+          <SuggestionsChip onClick={() => addQuestion("Provide me a SWOT Analysis for Tesla")}>
+            Provide me a SWOT Analysis for Tesla
+          </SuggestionsChip>
+          <SuggestionsChip onClick={() => addQuestion('Show me a list of recent Ratings Actions for Financial Institutions')}>
+            Show me a list of recent Ratings Actions for Financial Institutions 
+          </SuggestionsChip>
+        </Suggestions>
+      </div>
+      <div>
+        <H2>
+          About Chat<span>RD</span>&apos;s Model
+        </H2>
+        <ChatRDModel>
+          <div className="darkImage" style={{ background: '#1B1B1B' }}>
+            <img src={require('../../assets/images/chatIQModal.svg')} />
+          </div>
+          <div className="lightImage" style={{ background: '#E9E9E9' }}>
+            <img src={require('../../assets/images/chatIQModal.svg')} />
+          </div>
+          <div>
+            <H4>
+            The ChatRD model is trained on data from S&P Global's Rating credit ratings data and research. Currently
+              the model can answer questions about{' '}
+            </H4>
+            <ul>
+              <li>Issuers (all sectors & geography)</li>
+              <li>Securities (all sectors & geography)</li>
+              <li>Macroeconomics</li>
+              <li>Industries</li>
+              <li>Ratings Methodology & Criteria</li>
+            </ul>
+            <P>
+              A complete list of data and API services used by ChatRD is available upon request.
+            </P>
+          </div>
+        </ChatRDModel>
+      </div>
+    </NewContent>
+  );
+
+  return (
+    <Page footer={footer}>
+      {howToUse ? HowToUseChatRD : ExampleQuestions}
+      <Timeline>{children}</Timeline>
+    </Page>
+  );
+};

@@ -1,0 +1,967 @@
+import React, { useCallback } from 'react';
+import { createInteraction, getChatDetailsFromSession, getStreamingAPIUrl } from '../services/api';
+import { Feedback, GridModel, Interaction } from '../types/interaction';
+import { ChatHistoryResponse, ChatSessionHistoryRequestPayload, ContentType, GridExport, InteractionRequestPayload, KnowledgeDiscoveryDocuments, KnowledgeDiscoveryResponseNode, PayloadDetails, TableResponseNode, TextResponseNode } from '../types/api';
+import { Accordion, AccordionItem, H5 } from '@spglobal/react-components';
+import { Size } from '@spglobal/koi-helpers';
+import { useUserTraits } from '@spglobal/userprofileservice';
+import { ResponseView } from '../components/_common/ResponseView/ResponseView';
+import { DivformattedContent } from '../components/_common/Content';
+import { toDateCulture, toDateCultureResponse } from '../utils/dateLocalization';
+import { DocumentList } from '../components/_common/KnowledgeDiscoveryView/KnowledgeDiscoveryView.styles';
+import { RESEARCH_MAPPING } from '../constants/constants';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { ExtendedPatch, applyPatches } from '../components/ChatScreen/applyPatches';
+import moment from 'moment';
+
+
+interface IChatRDContextValue {
+  session?: string;
+  interactions: Interaction[];
+  askQuestion: (question: string) => void;
+  chatHistory:string;
+  tableRef: GridModel[];
+  copyToClipBoard: (interactionId:any) => GridExport;
+  setGridContext:(gridApi:any,interactionId:any) =>void;
+  newInteraction: (request: string) => void;
+  newInteractionChatHistory: (request: ChatHistoryResponse) => void;
+  updateInteraction: (id: string, updates: Partial<Interaction>) => void;
+  isLoading?: boolean;
+  scrollBottomMaxValue?: number;
+  payLoad?:PayloadDetails[];
+}
+
+const context = React.createContext<IChatRDContextValue>({} as IChatRDContextValue);
+
+const noResponse = (
+  <DivformattedContent> Something went wrong. Please try another question.</DivformattedContent>
+);
+
+const methodology=(
+  <>
+  <DivformattedContent className="spg-mb-sm">
+    ChatRD is an AI-Powered chatbot that utilizes an LLM (Large Language Model, which is a type of 
+    conversational Artificial Intelligence system based on advanced machine learning algorithms. 
+    ChatRD is designed to understand user queries and generate human-like text responses. 
+    ChatRD is trained specifically on S&P Ratings & Research, including a vast array of documents 
+    types like, Full Analysis, Research Updates, Commentaries and Criteria. This empowers ChatRD to
+    have deep context library and retrieve data from a rich source of information. 
+    </DivformattedContent>
+    <DivformattedContent>
+      As is the case with all models, ChatRD is not infallible. The accuracy of responses depends on 
+      several factors, including the ability to understand the context of a user prompt, the complexity 
+      of the language tasks it is trained on, the size and architecture of the model and the tuning on 
+      the model. Users can provide feedback to enhance the performance of ChatRD by submitting feedback 
+      directly for any responses that may contain any inaccuracies or errors. The feedback will be utilized
+      to retrain ChatRD and improve accuracy over time. 
+    </DivformattedContent>
+  </>
+);
+
+const capabilities=(
+  <>
+  <DivformattedContent className="spg-mb-sm">
+  ChatRD aims at providing RatingsDirect® users with comprehensive responses to a wide variety of questions pertaining to 
+    S&P Global Ratings and Research. 
+    </DivformattedContent>
+    <DivformattedContent>
+    Trained on a specifically curated corpus of information sourced from S&P Global's Ratings and Research documents, ChatRD empowers 
+    users to ask questions of a variety of topics including:  
+     <ul>
+      <li>
+        Issuers (Global Issuers, US Public Finance, and Structured Finance)  
+      </li>
+      <li>
+        Securities
+      </li>
+      <li>
+        Macroeconomics
+      </li>
+      <li>
+        Industries 
+      </li>
+      <li>
+        Ratings Methodology & Criteria
+      </li>
+     </ul>
+    </DivformattedContent>
+    <DivformattedContent>
+    It is important to note that ChatRD's capabilities are confined to the corpus of information that it has been trained on, thus limiting 
+    its ability to provide responses beyond this scope. Notably, topics such as broader public and private company details 
+    (e.g., stock information, corporate structure, public filings) or updates on current events sourced from Dow Jones and Market Intelligence 
+    News and Market Intelligence Research are outside ChatRD's scope. Additionally, ChatRD is not designed to deliver general responses that are 
+    characteristic of a typical LLM (Large Language Model) Chatbot and will restrict its output accordingly. 
+    </DivformattedContent>
+  </>
+);
+
+type IntermediateEventType =
+  | 'interactionCreated'
+  | 'analyzingQuestion'
+  | 'planGenerated'
+  | 'pullingData'
+  | 'dataPullSuccessful'
+  | 'generatingResponse'
+  | 'generationStarted';
+type EventType = IntermediateEventType | 'interactionFinished';
+
+/*const EVENT_TEXT_MAP: Record<IntermediateEventType, string> = {
+  interactionCreated: 'Asking question...',
+  analyzingQuestion: 'Analyzing question...',
+  planGenerated: 'Generated plan...',
+  pullingData: 'Pulling data...',
+  dataPullSuccessful: 'Data pull successful...',
+  generatingResponse: 'Generating response...',
+  generationStarted: 'Generating response...',
+};
+
+function getStepTextNode(event: IntermediateEventType): TextResponseNode {
+  return { type: ContentType.Text, content: EVENT_TEXT_MAP[event] };
+}*/
+
+type SpecPatch = ExtendedPatch & {
+  path: string;
+};
+
+// Immer uses the JSON patch standard except that `path` is an array so we need to transform the patches to what immer understands.
+// We also remove the initial `/` (or [""] value) to ensure immer traverses correctly.
+function transformPatches(patches: SpecPatch[]): ExtendedPatch[] {
+  return patches.map(
+    (patch: SpecPatch): ExtendedPatch => ({
+      ...patch,
+      path: patch.path.split('/').slice(1),
+    })
+  );
+}
+
+// TODO: Handle snake_case to camelCase between patches better.
+function patchMessage(
+  message: Interaction,
+  patches: ExtendedPatch[],
+  feedbackEnabled?: boolean
+): Interaction {
+  // Remove the FE-specific messaging we insert at the top.
+  let cleanResponseBody = [...message.responseBody];
+  cleanResponseBody.shift();
+  let isComplexType = false;
+  if(message.responseBody.length > 1 && message.responseBody[1].type === 'Table')
+    {
+      isComplexType = true;
+      cleanResponseBody.shift();
+    }
+  //let arrRespBody = [...cleanResponseBody];
+
+  //arrRespBody.push(arrRespBody.shift());
+
+  // Patches assume snake_case but the FE assumes camelCase so we temporarily put the values in snake_case.
+  const messageToPatch = {
+    session_id: message.sessionId,
+    interaction_id: message.interactionId,
+    response_body: cleanResponseBody,
+    response_context: message.responseContext,
+    type:message.type,
+  };
+
+  // Apply the patches
+  
+  const patchedSnakeCase = applyPatches(messageToPatch, patches);
+  
+
+  // Now remove the snake_case attributes in favor of the camelCase ones
+  const patchedCamelCase: Interaction = {
+    sessionId: patchedSnakeCase.session_id,
+    interactionId: patchedSnakeCase.interaction_id,
+    responseBody: patchedSnakeCase.response_body,
+    responseContext: patchedSnakeCase.response_context,
+    feedbackEnabled,
+    id:'',
+    loading:true,
+    type:patchedSnakeCase.type
+  };
+
+  return {
+    ...patchedCamelCase,
+    responseBody:
+      // Add the FE-specific messaging if this is not the final response.
+      isComplexType === true
+        ? 
+        //[message.responseBody[0],message.responseBody[1],...patchedCamelCase.responseBody]: feedbackEnabled == false ? [message.responseBody[0],...patchedCamelCase.responseBody] : patchedCamelCase.responseBody
+         [message.responseBody[0],message.responseBody[1],...patchedCamelCase.responseBody]: feedbackEnabled == false ? [message.responseBody[0],...patchedCamelCase.responseBody] : feedbackEnabled == true ? [message.responseBody[0],...patchedCamelCase.responseBody] : patchedCamelCase.responseBody
+        
+  };
+}
+
+const whatscoming=(<>
+  <DivformattedContent>
+  We're constantly striving to enhance the capabilities and user experience of ChatRD. Here is a glimpse of what you can expect in the near future:
+  <ul>
+    <li>
+    <b>Expanded Knowledge Base:</b> We're working diligently to enrich ChatRD's knowledge base by incorporating additional datasets and sources of information.  
+    </li>
+    <li>
+      <b>Improved Natural Language Understanding:</b> Our team is dedicated to refining ChatRD's natural language processing capabilities to better understand complex questions, nuances in language and context.
+    </li>
+    <li>
+    <b>Enhanced Personalization:</b> We recognize the importance of personalization in delivering a tailored user experience. In the coming updates, we plan to deliver suggested follow up questions powered by AI, 
+    the ability to create lists of prompts based on topics and the ability to translate responses to your preferred language.
+    </li>
+  </ul>
+  </DivformattedContent>
+  <DivformattedContent>
+  Stay tuned for these exciting updates as we continue to evolve and innovate to provide you with the best possible experience. Thank you for your continued support and feedback!
+  </DivformattedContent>
+</>);
+
+const desclaimer = (
+  <>
+    <DivformattedContent className="spg-mb-sm">
+    ChatRD is an AI-powered conversational assistant that utilizes an LLM (Large Language Model) with a
+    corpus of S&P Global Ratings credit ratings data and research to generate its responses.
+    It is important to note that ChatRD is intended solely for experimental and demonstration purposes. 
+    Consequently, there is a possibility that the responses provided may be inaccurate and/or incomplete. 
+    </DivformattedContent>
+    <DivformattedContent className="spg-mb-sm">
+    Users are encouraged to provide feedback to assist in refining ChatRD's functionality, 
+    with the aim of enhancing the accuracy and comprehensiveness of its responses. 
+    </DivformattedContent>
+    <DivformattedContent className="spg-mb-sm">
+    It is imperative to understand that any actions taken based on a particular response provided by 
+    ChatRD are undertaken at the user's own risk. ChatRD explicitly disclaims any responsibility for 
+    losses or damages that may arise from the use of its services. 
+    </DivformattedContent>
+    <DivformattedContent className="spg-mb-sm">
+    By engaging with ChatRD, users acknowledge and accept the inherent limitations and risks associated 
+    with the platform. It is recommended that users exercise caution and undertake independent verification 
+    before making decisions based on ChatRD's responses.
+    </DivformattedContent>
+  </>
+);
+const faq = (
+  <Accordion accordionSize={Size.MEDIUM} removeItemSpacing>
+    <AccordionItem isDefaultOpen header="What is this?">
+      <p className="spg-mb-sm">
+        ChatRD aims to be an easy-to-use AI-driven chat interface that specializes in business and
+        finance question-answering. This tool is not meant to provide financial advice.
+      </p>
+      <p className="spg-mb-sm">
+        We are looking to test, get feedback, and understand real client use to improve upon our
+        model.
+      </p>
+      <p className="spg-mb-sm">
+        Interact with ChatRD. Ask questions in natural language. The model can answer questions
+        about a single to multi-company information, including but not limited to company
+        organization, professionals, financials, news, acquisitions, etc.
+      </p>
+    </AccordionItem>
+    <AccordionItem header="What we need">
+      <p className="spg-mb-sm">
+        Ask ChatRD some business and finance specific questions. Thumbs up the “reasonable” answer
+        or Thumbs down the “unreasonable” answer. Add additional information in the feedback box if
+        you have any.
+      </p>
+      <p className="spg-mb-sm">
+        Note: The model is still a work in progress, so do not be surprised if you find that it
+        struggles with questions that you ask. Finding out the useful things that it cannot do is
+        very valuable for us on its own. Currently ChatRD does not support conversational
+        back-and-forth chat.
+      </p>
+    </AccordionItem>
+    <AccordionItem header="Examples">
+      <p className="spg-mb-sm">What was Apple&apos;s stock price on April 1st 2023?</p>
+      <p className="spg-mb-sm">What are some recent developments at Apple?</p>
+      <p className="spg-mb-sm">What is the total revenue of Apple YTD?</p>
+      <p className="spg-mb-sm">Let all CEOs that attended Harvard</p>
+      <p className="spg-mb-sm">Who are some of Apple&apos;s competitors?</p>
+      <p className="spg-mb-sm">Who is on the board of Apple?</p>
+      <p className="spg-mb-sm">Give me an example of 5 private companies operating in Germany.</p>
+      <p className="spg-mb-sm">How many acquisitions has S&P Global made in the last five years?</p>
+    </AccordionItem>
+    <AccordionItem header="Model details ">
+      <p className="spg-mb-sm">
+        The model currently has access to the following data sets. Though the model has access, it
+        may not know yet how to query for a specific table, but don&apos;t let the current list of
+        data sets or functionality limit your questions. If there is a question, dataset or API
+        service you think would be particularly valuable, let us know.
+      </p>
+      <p className="spg-mb-sm">
+        BMI Index Data, Business Entity Cross Reference Service (BECRS), Business Relationships,
+        Company Intelligence, Company Relationships, Competitors, Compustat Snapshot, Corporate
+        Tracker, Document Reference, Foundation Company SME, Future Events, Global Events, Global
+        Instruments Cross Reference Service (GICRS), Industry Sector Cross Reference Service
+        (ISCRS), Key Developments, Key Documents, MI Integrated Market Data, Machine Readable Broker
+        Research, Machine Readable Filings, Machine Readable Transcripts, Market Intelligence News,
+        Products, Professionals, S&P Capital IQ Base Files, S&P Capital IQ Company Industry GICS,
+        S&P Capital IQ Latest Financials, S&P Capital IQ Market Data, S&P Capital IQ Premium
+        Financials, S&P Capital IQ Private Company Financials, SNL Branch Data, SNL Corporate Data,
+        SNL Real Estate, SNL Reference, SNL Regulatory Data, SNL Sector Financials, Transactions,
+        Transactions M&A, Transactions Offerings, Transactions Rounds of Funding
+      </p>
+    </AccordionItem>
+  </Accordion>
+);
+
+export const ChatRDProvider: React.FC = ({ children }) => {
+  const [session, setSession] = React.useState<string>("");
+  const [payLoad, setPayload] = React.useState<PayloadDetails[]>([]);
+  const controller = new AbortController();
+  const {signal} = controller;
+  let [interactions, setInteractions] = React.useState<Interaction[]>([]);
+  let [tableRef, setTable] = React.useState<GridModel[]>([]);
+  let streamStart = 0;
+  const handleCopyToClipboard = (interactionId:any) :GridExport => {
+    if (tableRef) {
+      const rowData:any[]=[];
+      let activeGrid = tableRef.find((int:any)=>int.interactionId == interactionId);
+      let gridExport:GridExport= {rowData:[]};
+      activeGrid.gridData.forEachNode((node:any)=>rowData.push(node.data));
+      gridExport.rowData = rowData;
+      return gridExport;
+    }
+    return null;
+  };
+  
+  //const [messages, setMessages] = useState([]);
+
+  
+  const isLoading =
+    interactions.filter((data: Interaction) => data.loading).length > 0 ? true : false;
+  const [chatHistory, setchatHistory] = React.useState<string>();
+
+  const updateInteraction = (id: string, updates: Partial<Interaction>) => {
+    setInteractions((pre) =>
+      pre.map((t) => {
+        if (t.id == id) {
+          return { ...t, ...updates };
+        } else {
+          return t;
+        }
+      })
+    );
+  };
+
+  const getLastInteractionId = () => {
+    const respondedInteraction = interactions.filter(
+      (data: Partial<Interaction>) => ( !(data.sessionId ==null || data.sessionId == undefined) && data.id.indexOf('-') > -1)
+    );
+    const lastInteraction = respondedInteraction[respondedInteraction.length - 1];
+    return lastInteraction ? lastInteraction.id : undefined;
+  };
+
+  const getLastInteractionStreamId = () => {
+    const respondedInteraction = interactions.filter(
+      (data: Partial<Interaction>) => ( !(data.sessionId ==null || data.sessionId == undefined) && data.id.indexOf('-') > -1)
+    );
+    if(respondedInteraction && respondedInteraction.length > 0)
+      {
+        const lastInteraction = respondedInteraction[respondedInteraction.length - 1];
+        return lastInteraction ? lastInteraction.id : undefined;
+      }
+      else
+      {
+        return interactions && interactions.length > 0 ? (interactions[interactions.length -1].id !== '')? interactions[interactions.length -1].id :interactions[interactions.length -1].interactionId:undefined;
+      }
+  };
+
+  const userInformation = useUserTraits(['keyOnlineUser','timeZoneAbbreviation', 'culture', 'mSTimeZoneID']);
+
+  const value: IChatRDContextValue = React.useMemo(() => {
+    return {
+      session,
+      interactions,
+      isLoading,
+      chatHistory,
+      tableRef,
+      copyToClipBoard: (interactionId:any)=>{
+        return handleCopyToClipboard(interactionId);
+      },
+      setGridContext:(gridApi:any,interactionId:string)=>{
+        let temp:GridModel={ interactionId:interactionId,gridData: gridApi};
+        tableRef.push(temp); 
+        setTable(tableRef);
+      },
+      askQuestion : useCallback((request: string): void => {
+        setchatHistory("New");
+        
+    const interaction: Interaction = {
+      sessionId:session,
+      type:"user",
+      id: new Date().valueOf().toString(),
+      date: toDateCulture(
+        new Date(),
+        userInformation.mSTimeZoneID
+      ), 
+      req: request,
+      loading: true,
+    };
+    
+    try {
+      if (request.toLowerCase() == 'chatrd legal disclaimer' || request.toLowerCase() == 'full disclaimer') {
+        setInteractions([...interactions, interaction]);
+          updateInteraction(interaction.id, {
+            ...interaction,
+            sessionId:null,
+            loading: false,
+            responseBody: [{ type: ContentType.Text, content: desclaimer }],
+            responseContext:[],
+            feedbackEnabled: false,
+          });
+        
+      } else if (request.toLowerCase() == 'how to use chatrd') {
+        setInteractions([...interactions, interaction]);
+        updateInteraction(interaction.id, {
+          ...interaction,
+          loading: false,
+          sessionId:null,
+          responseBody: [{ type: ContentType.Text, content: faq }],
+          responseContext:[],
+          feedbackEnabled: false,
+        });
+      }else if(request.toLowerCase() == 'capabilities & limitations') {
+        setInteractions([...interactions, interaction]);
+        updateInteraction(interaction.id, {
+          ...interaction,
+          sessionId:null,
+          loading: false,
+          responseBody: [{ type: ContentType.Text, content: capabilities }],
+          responseContext:[],
+          feedbackEnabled: false,
+        });
+      }else if(request.toLowerCase() == 'methodology') {
+        setInteractions([...interactions, interaction]);
+        updateInteraction(interaction.id, {
+          ...interaction,
+          sessionId:null,
+          loading: false,
+          responseBody: [{ type: ContentType.Text, content: methodology }],
+          responseContext:[],
+          feedbackEnabled: false,
+        });
+      }else if(request.toLowerCase() == "what's coming") {
+        setInteractions([...interactions, interaction]);
+        updateInteraction(interaction.id, {
+          ...interaction,
+          sessionId:null,
+          loading: false,
+          responseBody: [{ type: ContentType.Text, content: whatscoming }],
+          responseContext:[],
+          feedbackEnabled: false,
+        });
+      }
+      else {
+        setInteractions([...interactions, interaction]);
+        
+          const args: InteractionRequestPayload = {
+            sessionId: session,
+            userInput: [
+              {
+                type: ContentType.Text,
+                value: request,
+              },
+            ],
+            previousInteractionId: getLastInteractionStreamId(),
+            supportedNodeTypes: [
+              ContentType.Text,
+              ContentType.Code,
+              ContentType.Table,
+              ContentType.KnowledgeDiscovery,
+            ],
+          };
+            
+            const APIUrl = getStreamingAPIUrl();
+            const baseInit = {
+            method: 'POST',
+            signal,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream'
+            },
+              body: JSON.stringify(args),
+              openWhenHidden: true,
+            };
+            streamStart = 0;
+            const { session_id: sessionId, interaction_id: interactionId } = JSON.parse("{}");
+            const initialResponse: Interaction = {
+              sessionId,
+              type:"user",
+              interactionId,
+              responseBody: [{ type: ContentType.Text, content: 'Generating response' }],
+              responseContext: [],
+              id:'',
+              loading:true
+  
+            };
+            
+            setInteractions((prev:any) => {
+                      const next = [...prev];
+                      return [...next, initialResponse];
+            });
+
+            fetchEventSource(APIUrl, {
+              ...baseInit,
+              onmessage(ev:any) {
+                if(ev.data)
+                {
+                    const eventType = ev.event as EventType;
+                let patch = { op: '', value: '',
+                            path:''
+                        };
+                const patchesArr: any =[];
+                let feedbackEnabled = false;
+                let streamData = JSON.parse(ev.data);
+                const { sessionId: sessionId, interactionId: interactionId,responseBody: responseBody, responseTimestamp: responseTimestamp,op:op } = streamData;
+                if(op == 'end' && session == '')
+                  {
+                    setSession(sessionId);
+                  }
+                
+                switch (eventType) {
+                  case 'generatingResponse': {
+                     if(streamStart == 0)
+                      {
+                          streamStart = 1;
+                            if(op == 'add' && (responseBody[0].answer))
+                            { 
+                              setInteractions((prev:any) => {
+                                const next = [...prev];
+                                const lastMessage = next.pop();
+                                lastMessage.session_id = sessionId;
+                                lastMessage.sessionId = sessionId;
+                                lastMessage.type = "user";
+                                lastMessage.interaction_id = interactionId;
+                                lastMessage.interactionId = interactionId;
+                                lastMessage.responseBody[0].content = responseBody[0].answer;
+                                lastMessage.responseBody[0].documents = responseBody[0].documents;
+                                lastMessage.responseTimeStamp = responseTimestamp;
+                                return prev;
+                            });
+  
+                            }
+                            else
+                            {
+                              const { responseBody: responseBody,op:op } = streamData;
+                              if(op == 'add')
+                              {
+                                  patch.op = 'add';
+                                patch.value = JSON.parse('{"type":"Text","content":""}');
+                                patch.path = '/response_body/0';
+                                patchesArr.push(patch);
+                                const patches = transformPatches(patchesArr);
+          
+                                
+                                
+                                setInteractions((prev:any) => {
+                                  const next = [...prev];
+                                  const lastMessage = next.pop();
+                                  lastMessage.session_id = sessionId;
+                                  lastMessage.type = "user";
+                                  lastMessage.sessionId = sessionId;
+                                  lastMessage.interaction_id = interactionId;
+                                  lastMessage.interactionId = interactionId;
+                                  if(lastMessage.responseBody)
+                                    {
+                                      lastMessage.responseBody.push({ type: ContentType.Text, content: responseBody[0].answer,documents : responseBody[0].documents});
+                                  const patchedMessage = patchMessage(
+                                    lastMessage,
+                                    patches,
+                                    feedbackEnabled
+                                  );
+                                  
+                                  next.push(patchedMessage);
+                                    }
+                                  return next;
+                                });
+                                return;
+                                }
+                            }
+                      }
+                      else{
+                          if(streamStart == 1)
+                          {
+                            const { responseBody: responseBody,op:op,responseTimestamp: responseTimestamp } = streamData;
+                            if(op == 'add')
+                            {
+                              if(responseBody[0].type === 'Table' )
+                                {
+                                  setInteractions((prev:any) => {
+                                    const next = [...prev];
+                                    const lastMessage = next.pop();
+                                    lastMessage.sessionId = sessionId;
+                                    lastMessage.type = "user";
+                                    lastMessage.interactionId = interactionId;
+                                    lastMessage.responseBody = lastMessage.responseBody.concat(responseBody);
+                                    lastMessage.responseTimeStamp = responseTimestamp;
+                                    return prev;
+                                  });
+                                }
+                                else
+                                {
+                              patch.op = 'add';
+                              patch.value = JSON.parse('{"type":"Text","content":""}');
+                              patch.path = '/response_body/0';
+                              patchesArr.push(patch);
+                              const patches = transformPatches(patchesArr);
+      
+                            
+                            
+                            setInteractions((prev:any) => {
+                              const next = [...prev];
+                              const lastMessage = next.pop();
+                              lastMessage.session_id = sessionId;
+                              lastMessage.sessionId = sessionId;
+                              lastMessage.type = "user";
+                              lastMessage.interaction_id = interactionId;
+                              lastMessage.interactionId = interactionId;
+                              //if (!lastMessage || lastMessage.req) return prev;
+                              if(lastMessage.responseBody)
+                                {
+                                  lastMessage.responseBody.push({ type: ContentType.Text, content: responseBody[0].answer,documents : responseBody[0].documents}); 
+                                    
+                                const patchedMessage = patchMessage(
+                                lastMessage,
+                                patches,
+                                feedbackEnabled
+                              );
+                              
+                              next.push(patchedMessage);
+                                }
+                              return next;
+                            });
+                            return;
+                            }
+                            }
+                            else
+                            {
+                              
+                                patch.op = JSON.parse(ev.data).op;
+                                patch.value = JSON.parse(ev.data).responseBody[0].answer;
+                                patch.path = '/response_body/0/content'; 
+                              
+                            //const patches = hasData ? (JSON.parse(ev.data).prompt_response_chunk) : [];
+                            if(patch.op == 'end')
+                              {
+                                feedbackEnabled = true;
+                                //return;
+                              }
+                            patchesArr.push(patch);
+                            const patches = transformPatches(patchesArr);
+      
+                            //const patches = ev.data;
+                            
+                            setInteractions((prev:any) => {
+                              const next = [...prev];
+                              const lastMessage = next.pop();
+                              lastMessage.session_id = sessionId;
+                              lastMessage.type = "user";
+                              lastMessage.interaction_id = interactionId;
+                              //if (!lastMessage || lastMessage.req) return prev;
+              
+                              const patchedMessage = patchMessage(
+                                lastMessage,
+                                patches,
+                                feedbackEnabled
+                              );
+              
+                              next.push(patchedMessage);
+                              return next;
+                            });
+                            return;
+                          }
+                          return;
+                          }
+                          
+                      }
+                  }
+                }
+              }
+                
+              },
+              onerror(err:any) {
+                throw err;
+              },
+              async onopen(response:any) {
+                if (!response.ok) throw response;
+              },
+              onclose() {
+                controller.abort();
+              },
+            }).catch(() => {
+              
+            });
+        //setchatHistory("New");
+        
+      }
+    } catch (e) {
+      updateInteraction(interaction.id, {
+        ...interaction,
+        sessionId:session,
+        loading: false,
+        responseBody: [{ type: ContentType.Text, content: noResponse }],
+        responseContext: [],
+        feedbackEnabled: false,
+      });
+    }
+      },[session,interactions]), 
+      newInteraction: async (request: string) => {
+        setchatHistory("New");
+        const interaction: Interaction = {
+          sessionId:session,
+          type:"user",
+          id: new Date().valueOf().toString(),
+          date: toDateCulture(
+            new Date(),
+            userInformation.mSTimeZoneID
+          ), 
+          req: request,
+          loading: true,
+        };
+        setInteractions([...interactions, interaction]);
+        try {
+          if (request.toLowerCase() == 'chatrd legal disclaimer' || request.toLowerCase() == 'full legal disclaimer') {
+            updateInteraction(interaction.id, {
+              ...interaction,
+                sessionId:null,
+              loading: false,
+              responseBody: [{ type: ContentType.Text, content: desclaimer }],
+              res: desclaimer,
+              responseContext: [],
+              feedbackEnabled: false,
+            });
+          } else if (request.toLowerCase() == 'how to use chatrd') {
+            updateInteraction(interaction.id, {
+              ...interaction,
+              loading: false,
+              sessionId:null,
+              responseBody: [{ type: ContentType.Text, content: faq }],
+              res: faq,
+              responseContext: [],
+              feedbackEnabled: false,
+            });
+          }else if(request.toLowerCase() == 'capabilities & limitations') {
+            updateInteraction(interaction.id, {
+              ...interaction,
+              sessionId:null,
+              loading: false,
+              responseBody: [{ type: ContentType.Text, content: capabilities }],
+              res: capabilities,
+              responseContext: [],
+              feedbackEnabled: false,
+            });
+          }else if(request.toLowerCase() == 'methodology') {
+            updateInteraction(interaction.id, {
+              ...interaction,
+              sessionId:null,
+              loading: false,
+              responseBody: [{ type: ContentType.Text, content: methodology }],
+              res: methodology,
+              responseContext: [],
+              feedbackEnabled: false,
+            });
+          }else if(request.toLowerCase() == "what's coming") {
+            updateInteraction(interaction.id, {
+              ...interaction,
+              sessionId:null,
+              loading: false,
+              responseBody: [{ type: ContentType.Text, content: whatscoming }],
+              res: whatscoming,
+              responseContext: [],
+              feedbackEnabled: false,
+            });
+          }
+          else {
+            //setchatHistory("New");
+            const args: InteractionRequestPayload = {
+              sessionId: session,
+              keyonlineuser:userInformation?.keyOnlineUser,
+              userInput: [
+                {
+                  type: ContentType.Text,
+                  value: request,
+                },
+              ],
+              previousInteractionId: getLastInteractionId(),
+              supportedNodeTypes: [
+                ContentType.Text,
+                ContentType.Code,
+                ContentType.Table,
+                ContentType.KnowledgeDiscovery,
+              ],
+            };
+            const response = await createInteraction(args);
+            let temp:any[]=[];
+            response?.responseBody.map((value: TextResponseNode | TableResponseNode | KnowledgeDiscoveryResponseNode)=>{
+              if(value?.documents!=null && value?.documents.length > 0)
+                if(value?.documents[0].details)
+                  {
+                    let payLoad:PayloadDetails = {interactionId:'',payload:''};
+                    let payLoadDetails:PayloadDetails[] = [];
+                    payLoad.interactionId = response.interactionId;
+                    payLoad.payload = value?.documents[0].details;
+                    payLoadDetails.push(payLoad);
+                    setPayload(payLoadDetails);
+                  }
+                temp.push(value);
+            });
+              
+            setSession(response?.sessionId);
+            updateInteraction(interaction.id, {
+              ...interaction,
+              sessionId:response?.sessionId,
+              id: response.interactionId,
+              date:interaction.date,
+              loading: false,
+              res: (
+                <>
+                  <ResponseView data={response?.responseBody || null} interactionId={response.interactionId} interactionType='user' />
+                  <br/>
+                  <div className="responseDate" style={{display:'flex',marginLeft:'auto',marginRight:'-51px'}}>
+                    <span>{toDateCultureResponse(
+                    response?.responseTimestamp,
+                    userInformation.mSTimeZoneID
+                      )}</span>
+                  </div>
+                  {temp.length >0 && <H5>Sources:</H5>}
+                  <ul style={{fontSize:'14px'}}>
+                  <div>
+                    {response?.responseBody.map((value: TextResponseNode | TableResponseNode | KnowledgeDiscoveryResponseNode) => 
+                      value?.documents && value?.documents.map((doc:KnowledgeDiscoveryDocuments)=>(
+                        <DocumentList>
+                        <a href={doc.url} target="_blank">{doc.title}</a>
+                        <span>{doc.date !=null ? " " + RESEARCH_MAPPING[doc.type as keyof typeof RESEARCH_MAPPING] + " published " + moment(doc.date).format('MMMM Do, YYYY') :''}</span>
+                      </DocumentList>
+                      )
+                      
+                    )) }
+                  </div>
+                </ul>
+
+                </>
+              ),
+              responseContext: response?.responseContext,
+              feedbackEnabled: true,
+            });
+          }
+        } catch (e) {
+          updateInteraction(interaction.id, {
+            ...interaction,
+            sessionId:session,
+            loading: false,
+            res: noResponse,
+            responseContext: [],
+            feedbackEnabled: false,
+          });
+        }
+      },
+      newInteractionChatHistory: async (request: ChatHistoryResponse) => {
+        setSession(request.sessionId);
+        setchatHistory("History");
+        const args: ChatSessionHistoryRequestPayload = {
+          sessionId: request.sessionId
+        };
+        let response = await getChatDetailsFromSession(args);
+        let tempInteractions : Interaction[]=[];
+        if(response !=null)
+        {
+          response = response.sort((a, b) => {
+            if (a.requestTimeStamp < b.requestTimeStamp) {
+                return -1;
+            }
+            if (a.requestTimeStamp > b.requestTimeStamp) {
+                return 1;
+            }
+            return 0;
+          });
+          interactions =[];
+          for(var k=0;k<response.length;k++)
+          {
+            let feedbackResp:Feedback={
+              sentiment : response[k].feedback?.feedback_sentiment,
+              tags:response[k].feedback?.tags,
+              text:response[k].feedback?.text_feedback
+            };
+            let interaction: Interaction = {
+              id: response[k].interactionId,
+              type:"his",
+              feedback : feedbackResp,
+              sessionId:response[k].sessionId,
+              date:toDateCultureResponse(
+                response[k]?.requestTimeStamp,
+                userInformation.mSTimeZoneID
+              ),
+              req: response[k].userInput[0].value,
+              loading: true,
+            };
+            //setInteractions([...interactions, interaction])
+            interactions.push(interaction);
+            tempInteractions.push(interaction);
+          }
+          setInteractions([...interactions]);
+          let payLoadDetails:PayloadDetails[] = [];
+          for(var j=0;j<tempInteractions.length;j++)
+          {
+            let tempHis:any[]=[];
+            response[j]?.responseBody.map((value: TextResponseNode | TableResponseNode | KnowledgeDiscoveryResponseNode)=>{
+              if(value?.documents!=null && value?.documents.length > 0)
+                if(value?.documents[0].details)
+                  {
+                    let payLoad:PayloadDetails = {interactionId:'',payload:''};
+                    payLoad.interactionId = tempInteractions[j].id;
+                    payLoad.payload = value?.documents[0].details;
+                    payLoadDetails.push(payLoad);
+                    setPayload(payLoadDetails);
+                  }
+                tempHis.push(value);
+            });
+            updateInteraction(tempInteractions[j].id, {
+              ...tempInteractions[j],
+              sessionId:tempInteractions[j].sessionId,
+              feedback:tempInteractions[j].feedback,
+              date:  toDateCultureResponse(
+                response[j].requestTimeStamp,
+                userInformation.mSTimeZoneID
+                  ),
+              loading: false,
+              res: (
+                <>
+                  <ResponseView data={response[j].responseBody || null} interactionId={tempInteractions[j].id} interactionType='user'/>
+                  <div className="responseDate" style={{display:'flex',marginLeft:'auto',marginRight:'-51px'}}>
+                    <span>{toDateCultureResponse(
+                    response[j].responseTimestamp,
+                    userInformation.mSTimeZoneID
+                      )}</span>
+                  </div>
+                  {tempHis.length > 0 && <H5>Sources:</H5>}
+                  <ul style={{fontSize:'14px'}}>
+                  
+                  <div>
+                    {response[j].responseBody.map((value: TextResponseNode | TableResponseNode | KnowledgeDiscoveryResponseNode) =>
+                      value?.documents && value?.documents.map((doc:KnowledgeDiscoveryDocuments)=>(
+                        <DocumentList>
+                        <a href={doc.url} target="_blank">{doc.title}</a>
+                        <span>{doc.date !=null ? " " + RESEARCH_MAPPING[doc.type as keyof typeof RESEARCH_MAPPING] + " published "  + moment(doc.date).format('MMMM Do, YYYY') :''}</span>
+                      </DocumentList>
+                      )
+                      
+                    )
+                    
+                    ) }
+                  </div>
+                  </ul>
+                  
+                </>
+              ),
+              responseContext: response[j].responseContext,
+              feedbackEnabled: true,
+            });
+          }
+        }
+      },
+      updateInteraction,
+      scrollBottomMaxValue: document.getElementById('scrollToBottomLI')?.offsetTop || Infinity,
+      payLoad
+    };
+  }, [session, interactions,chatHistory,tableRef,payLoad]);
+
+  return <context.Provider value={value}>{children}</context.Provider>;
+};
+
+export const useChatRD = () => React.useContext(context);

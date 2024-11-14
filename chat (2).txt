@@ -4,6 +4,9 @@ interface IChatRDContextValue {
   payLoad?:PayloadDetails[];
 }
 
+const formats = ['MM/DD/YYYY','DD/MM/YYYY','YYYY/DD/MM','YYYY/MM/DD','YYYY-MM-DD','MM.DD.YYYY','DD.MM.YYYY','YYYY.MM.DD','YYYY.DD.MM','DD-MM-YYYY','MM-DD-YYYY'];
+    let isvalid = moment(value,formats,true).isValid();
+
 const context = React.createContext<IChatRDContextValue>({} as IChatRDContextValue);
 export const ChatRDProvider: React.FC = ({ children }) => {
   const [session, setSession] = React.useState<string>("");

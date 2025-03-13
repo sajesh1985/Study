@@ -1,3 +1,5 @@
+| Target Company | Valuation | Transaction Date | | --- | --- | --- | | Wright Medical Group N.V. | Not Specified | 2020 | | Voceru Communications | Not Specified | 2022 | | Inari Medical Inc. | $4.9 billion | Q1 2025 (Expected) |
+
 var downExcel: any = await downloadExcel(resp.message);
             //const buffer = new ArrayBuffer(downExcel.length);
             const binaryStr = new TextEncoder().encode(downExcel);

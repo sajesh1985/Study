@@ -1,3 +1,36 @@
+ const ExpandableCellRenderer = (props:any) => {
+    const { value,data,api,node } = props; // Get text value & grid API
+    const [expanded, setExpanded] = useState(false);
+    const toggleExpand = () => {
+      setExpanded(!expanded);
+      const updRow = {...data, isExpanded: !expanded};
+      //data.isExpanded = !isExpanded;
+      node.setData(updRow);
+      node.setRowHeight(!expanded ? 150:30);
+        api.refreshCells({ force: true });
+        api.onRowHeightChanged();
+    };
+
+    return (
+      <div className='cellWrap'>
+        <span className='cellWrapTxt'>{expanded ? value : value.substring(0, 20) + "..."}</span>
+        {value && value.length > 20 && (
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              toggleExpand();
+            }}
+            className='cellMorelink'
+          >
+            {expanded ? "Show Less" : "Show More"}
+          </a>
+        )}
+      </div>
+    );
+  };
+
+
 **M&A Transactions by Stryker in the Last 5 Years**\n\n| Target Company | Valuation | Transaction Date |\n| --- | --- | --- |\n| Wright Medical Group N.V. | Not Specified | 2020 |\n| Voceru Communications | Not Specified | 2022 |\n| Inari Medical Inc. | $4.9 billion | Q1 2025 (Expected) |\n\nThe latest S&P Global Ratings research does not contain the valuation details for the acquisitions of Wright Medical Group N.V. and Voceru Communications. However, it does mention that Stryker's acquisition of Inari Medical Inc. is valued at $4.9 billion and is expected to close in the first quarter of 2025.
 var downExcel: any = await downloadExcel(resp.message);
             //const buffer = new ArrayBuffer(downExcel.length);

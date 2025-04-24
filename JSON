@@ -1,4 +1,20 @@
- const ExpandableCellRenderer = (props:any) => {
+
+const GroupRowRenderer = (params:any ) => {
+    const {node}  = params;
+    const [isExpanded, setIsExpanded] = React.useState(node.expanded);
+
+    const onExpandToggle = () => {
+      const newState = !isExpanded;
+      node.setExpanded(newState);
+      setIsExpanded(newState);
+    };
+    return (<div style={{padding:'5px 1px 1px 1px',fontWeight:'700'}}><span style={{cursor:'pointer'}} onClick={onExpandToggle}>
+      {isExpanded && node?.rowIndex === 0 ? <Icon icon={faCaretUp}
+        size={Size.MEDIUM}></Icon> : <Icon icon={faCaretDown}
+        size={Size.MEDIUM}></Icon>}</span>{key}{gpCnt ? modKey:''}</div>);
+  }
+
+const ExpandableCellRenderer = (props:any) => {
     const { value,data,api,node } = props; // Get text value & grid API
     const [expanded, setExpanded] = useState(false);
     const toggleExpand = () => {

@@ -1,4 +1,33 @@
+patch.op = JSON.parse(ev.data).op;
+                            patch.value = JSON.parse(ev.data).responseBody[0].answer.replace(/\n{3,}/g, '\n\n');
+                            patch.path = '/response_body/0/content';
 
+                            patchesArr.push(patch);
+                            const patches = transformPatches(patchesArr);
+
+                            setTimeout(() => {
+                              setInteractions((prev: any) => {
+                                const next = [...prev];
+                                streamStartIndex++;
+                                const lastMessage = next.pop();
+                                if (patch.op == 'end') {
+                                  feedbackEnabled = true;
+                                  lastMessage.loading = false;
+                                }
+                                const patchedMessage = patchMessage(
+                                  lastMessage,
+                                  patches,
+                                  feedbackEnabled
+                                );
+
+                                next.push(patchedMessage);
+                                return next;
+                              });
+                            },2000);
+                            return;
+                          }
+                          return;
+                        }
 const GroupRowRenderer = (params:any ) => {
     const {node}  = params;
     const [isExpanded, setIsExpanded] = React.useState(node.expanded);

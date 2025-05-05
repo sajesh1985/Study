@@ -1,3 +1,28 @@
+"suggestionsData": {
+        "title": "Not the right entity?",
+        "behavior": "expand",
+        "content": [
+          {
+            "text": "We found other close matches. Select an entity from the list below to re-run your question:",
+            "suggestions": null
+          },
+          {
+            "text": null,
+            "suggestions": [
+              {
+                "id": "19912563",
+                "name": "ZoomInfo Technologies Inc.",
+                "query": "What is the rating of ZoomInfo Technologies Inc.?"
+              }
+            ]
+          },
+          {
+            "text": "Tip: Use the @ symbol in your question to pull up search results and select the company you'd like to see info for. The RD badge indicates Ratings coverage.",
+            "suggestions": null
+          }
+        ]
+      },
+
 patch.op = JSON.parse(ev.data).op;
                             patch.value = JSON.parse(ev.data).responseBody[0].answer.replace(/\n{3,}/g, '\n\n');
                             patch.path = '/response_body/0/content';

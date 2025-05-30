@@ -1,3 +1,118 @@
+export const ReportBuilder = () => {
+    const initialItems = [
+        { id: 'item-1', content: 'Item 1' },
+        { id: 'item-2', content: 'Item 2' },
+        { id: 'item-3', content: 'Item 3' },
+    ];
+    const [availableItems, setAvailableItems] = useState(initialItems);
+    //const availableItems =initialItems;
+    const [droppedItems, setDroppedItems] = useState([]);
+
+    const onDragEnd = (result:any) => {
+        const { source, destination } = result;
+
+        // Dropped outside any droppable
+        if (!destination) return;
+
+        // Move within dropped area
+        if (source.droppableId === 'section2' && destination.droppableId === 'section2') {
+            const reordered = Array.from(droppedItems);
+            const [movedItem] = reordered.splice(source.index, 1);
+            reordered.splice(destination.index, 0, movedItem);
+            setDroppedItems(reordered);
+            return;
+        }
+
+        // Drag from section1 to section2
+        if (source.droppableId === 'section1' && destination.droppableId === 'section2') {
+            const draggedItem = availableItems[source.index];
+            const updatedAva = Array.from(availableItems);
+            updatedAva.splice(source.index,1);
+            setAvailableItems(updatedAva);
+
+            const updDropped = Array.from(droppedItems);
+            updDropped.splice(destination.index,0,draggedItem);
+            setDroppedItems(updDropped);
+            return;
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', gap: '2rem', padding: '2rem' }}>
+            <DragDropContext onDragEnd={onDragEnd}>
+                {/* Section 1: Draggable source */}
+                <Droppable droppableId="section1" isDropDisabled>
+                    {(provided:any) => (
+                        <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            style={{ border: '1px solid gray', padding: '1rem', width: '200px', minHeight: '200px' }}
+                        >
+                            <h4>Available Items</h4>
+                            {availableItems.map((item, index) => (
+                                <Draggable key={item.id} draggableId={item.id} index={index}>
+                                    {(provided:any) => (
+                                        <div
+                                            ref={provided.innerRef}
+                                            {...provided.draggableProps}
+                                            {...provided.dragHandleProps}
+                                            style={{
+                                                padding: '8px',
+                                                margin: '4px 0',
+                                                backgroundColor: '#eee',
+                                                ...provided.draggableProps.style,
+                                            }}
+                                        >
+                                            {item.content}
+                                        </div>
+                                    )}
+                                </Draggable>
+                            ))}
+                            {provided.placeholder}
+                        </div>
+                    )}
+                </Droppable>
+
+                {/* Section 2: Droppable and reorderable */}
+                <Droppable droppableId="section2">
+                    {(provided:any) => (
+                        <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            style={{ border: '1px solid gray', padding: '1rem', width: '200px', minHeight: '200px' }}
+                        >
+                            <h4>Dropped Items</h4>
+                            {droppedItems.map((item, index) => (
+                                <Draggable key={item.id} draggableId={item.id} index={index}>
+                                    {(provided:any) => (
+                                        <div
+                                            ref={provided.innerRef}
+                                            {...provided.draggableProps}
+                                            {...provided.dragHandleProps}
+                                            style={{
+                                                padding: '8px',
+                                                margin: '4px 0',
+                                                backgroundColor: '#cce5ff',
+                                                ...provided.draggableProps.style,
+                                            }}
+                                        >
+                                            {item.content}
+                                        </div>
+                                    )}
+                                </Draggable>
+                            ))}
+                            {provided.placeholder}
+                        </div>
+                    )}
+                </Droppable>
+            </DragDropContext>
+        </div>
+    );
+
+};
+
+
+
 import React from 'react';
 import { Button, H2, H4, P } from '@spglobal/react-components';
 

@@ -1,5 +1,63 @@
 <div data-rbd-droppable-id="section1" data-rbd-droppable-context-id="1" style="border: 1px solid gray; padding: 1rem; width: 200px; min-height: 200px;"><h4>Available Items</h4><div data-rbd-draggable-context-id="1" data-rbd-draggable-id="item-1" tabindex="0" role="button" aria-describedby="rbd-hidden-text-1-hidden-text-1" data-rbd-drag-handle-draggable-id="item-1" data-rbd-drag-handle-context-id="1" draggable="false" style="padding: 8px; margin: 4px 0px; background-color: rgb(238, 238, 238);">Item 1</div><div data-rbd-draggable-context-id="1" data-rbd-draggable-id="item-2" tabindex="0" role="button" aria-describedby="rbd-hidden-text-1-hidden-text-1" data-rbd-drag-handle-draggable-id="item-2" data-rbd-drag-handle-context-id="1" draggable="false" style="padding: 8px; margin: 4px 0px; background-color: rgb(238, 238, 238);">Item 2</div><div data-rbd-draggable-context-id="1" data-rbd-draggable-id="item-3" tabindex="0" role="button" aria-describedby="rbd-hidden-text-1-hidden-text-1" data-rbd-drag-handle-draggable-id="item-3" data-rbd-drag-handle-context-id="1" draggable="false" style="padding: 8px; margin: 4px 0px; background-color: rgb(238, 238, 238);">Item 3</div></div>
 
+const handleGo = async () => {
+    setLoading(true);
+    setError(null);
+    setJobId(null);
+    setReportData(null);
+    setShowApprove(false);
+    setFinalReport(null);
+    try {
+      const response = await fetch('http://localhost:8000/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: topic || 'Artificial Intelligence Ethics',
+          style: 'academic',
+          depth: 3,
+          sections: 4,
+          max_tokens: 3000,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setJobId(data.job_id);
+
+      // Poll for report details using the returned job_id
+      const startTime = Date.now();
+      let found = false;
+
+      while (Date.now() - startTime < 30000) {
+        const reportResponse = await fetch(`http://localhost:8000/reports/${data.job_id}`);
+        if (!reportResponse.ok) {
+          throw new Error(`HTTP error! status: ${reportResponse.status}`);
+        }
+        const reportJson = await reportResponse.json();
+        if (reportJson.awaiting_approval) {
+          setReportData(JSON.stringify(reportJson, undefined, 2));
+          setShowApprove(true);
+          found = true;
+          break;
+        }
+        await new Promise(res => setTimeout(res, 1000));
+      }
+
+      if (!found) {
+        setError('Error generating outline');
+        setReportData(null);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Unknown error');
+      setReportData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 export const ReportBuilder = () => {
     const initialItems = [
         { id: 'item-1', content: 'Item 1' },

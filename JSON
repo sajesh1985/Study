@@ -1,3 +1,10 @@
+<div class="StyledGenerateInfoBlock css-3m3o7h" style="
+    /* max-width: 433px; */ /* Adjust width for smaller screens */
+    white-space: unset;
+    /* word-wrap: break-word !important; */
+    overflow-wrap: break-word !important;
+">Credit<span class="red">Companion</span><sup style="font-size: 7px;">TM</sup> is powered by generative AI tew the<span class="css-1607lwk"><button id="legal_disclaimer_info_block" data-button-purpose="link" class="css-4kh7p6"><span data-button-text="true">Legal Disclaimer</span></button></span>for more information.</div>
+
 # This pipeline is for *frontend* CI builds and contains steps to deploy cdn assets / update feature flags in dev, staging and prod.
 variables:
   - group: spg-buildpipelines-shared-variables

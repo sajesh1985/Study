@@ -1,3 +1,179 @@
+# This pipeline is for *frontend* CI builds and contains steps to deploy cdn assets / update feature flags in dev, staging and prod.
+variables:
+  - group: spg-buildpipelines-shared-variables
+    
+pr:
+  branches:
+    include:
+    - main
+    - releases/*
+  paths:
+    include:
+      - src/synthia-web/**
+    
+trigger:
+  branches:
+    include:
+      - main
+      - releases/*
+  paths:
+    include:
+      - src/synthia-web/**
+
+resources:
+  repositories:
+    - repository: mfe-infra
+      type: git
+      ref: refs/heads/main
+      name: SNLServiceModules/mfe-infra
+    - repository: ado-yaml-templates
+      type: git
+      ref: refs/heads/master
+      name: DevOps Shared Framework/ado-yaml-templates
+
+stages:
+  # Do not perform scans on release branch
+  # - ${{if eq(startsWith(variables['Build.SourceBranch'], 'refs/heads/releases/'),False) }}:
+  #     - stage: AppSecStage
+  #       displayName: Security Assesment
+  #       dependsOn: []
+  #       jobs:
+  #         - job:
+  #           displayName: Security Scanning
+  #           pool:
+  #             vmImage: ubuntu-latest
+  #         - template: /appsec/pipelines/scan-javascript.v1.yml@ado-yaml-templates
+  #           parameters:
+  #             appsec:
+  #               whitesource:
+  #                 projectToken: $(whitesource_token)
+  #                 excludes: 'node_modules'
+  #                 apiKey: $(whitesource_apikey)
+  #                 whitesource_userkey: $(whitesource_userKey)
+  #               fortify:
+  #                 versionId: '16202'
+  #                 excludes: 'node_modules'
+  #                 pool: CIQProPool
+  #               sonarqube:
+  #                 projectKey: synthia
+  #                 projectName: synthia
+  #                 serviceConnection: 'sonarqube'
+  #                 sources: src/synthia-web
+  #             image:
+  #               framework: node
+  #               profile: 'javascript'
+  #               imageName: 'synthia'
+  #               devbranch: 'main'
+  #             nodeVersion: 22.x
+
+  - stage: build_stage
+    dependsOn: []
+    jobs:
+      - template: build/npm_build.v1.yml@mfe-infra
+        parameters:
+          node_version: 22.x
+          project_directory: /src/synthia-web/
+          dist_directory: /src/synthia-web/dist/
+          serviceName: mfe-creditmemo
+          postBuild:
+            # - task: Npm@1
+            #   displayName: 'Run Unit Tests'
+            #   inputs:
+            #     command: custom
+            #     customCommand: run test:coverage
+            #     workingDir: $(Build.SourcesDirectory)/
+            #     # verbose: true
+
+            - task: Npm@1
+              displayName: 'Lint'
+              inputs:
+                command: custom
+                customCommand: run lint
+                workingDir: $(Build.SourcesDirectory)/src/synthia-web/
+
+            # Publish code coverage results
+            # Publish Cobertura or JaCoCo code coverage results from a build
+            # - task: PublishCodeCoverageResults@1
+            #   inputs:
+            #     codeCoverageTool: Cobertura
+            #     summaryFileLocation: $(Build.SourcesDirectory)/src/synthia-web/test-coverage/cobertura-coverage.xml
+            #     pathToSources: $(Build.SourcesDirectory)/src/synthia-web/
+            #     failIfCoverageEmpty: true
+            #     #verbose: true
+
+            # For PullRequests, we want to assess whether the current PR reduces the code coverage for this repository
+            # We are checking that coverage for both lines and branches are greater than or equal to the most recent successful CI build
+            # We are continuing on Error so that the build continues.
+            # We can then use the codecoverage status check in ADO to specify whether this validation is optional or required.
+            # https://spglobal.visualstudio.com/SNLServiceModules/_settings/repositories?_a=policiesMid&repo=3e3e2075-d15a-459a-a85e-96731c72820a&refs=refs/heads/main
+            # - ${{if eq(variables['Build.Reason'], 'PullRequest')}}:
+            #     - task: mspremier.BuildQualityChecks.QualityChecks-task.BuildQualityChecks@8
+            #       displayName: 'Check build quality lines'
+            #       continueOnError: true
+            #       inputs:
+            #         checkCoverage: true
+            #         coverageType: lines
+            #         baseBranchRef: '$(SYSTEM_PULLREQUEST_TARGETBRANCH)'
+            #     - task: mspremier.BuildQualityChecks.QualityChecks-task.BuildQualityChecks@8
+            #       displayName: 'Check build quality branches'
+            #       continueOnError: true
+            #       inputs:
+            #         checkCoverage: true
+            #         coverageType: branches
+            #         baseBranchRef: '$(SYSTEM_PULLREQUEST_TARGETBRANCH)'
+
+  - ${{if in(variables['Build.Reason'], 'IndividualCI', 'BatchedCI', 'Manual')}}:
+      - ${{ if not(startsWith(variables['Build.SourceBranch'], 'refs/heads/releases/')) }}:
+          - stage: rollout_dev_stage
+            dependsOn: build_stage
+            displayName: Development rollout
+            jobs:
+              - template: deploy/cdn.v1.yml@mfe-infra
+                parameters:
+                  environment: development
+                  cdn_directory: spg/creditmemo
+                  flag_project_id: react-spa
+                  flag_id: fflag_mfe_synthia
+
+  #     - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/releases/') }}:
+  #         - stage: rollout_staging_stage
+  #           dependsOn: build_stage
+  #           displayName: Staging rollout
+  #           jobs:
+  #             - template: deploy/cdn.v1.yml@mfe-infra
+  #               parameters:
+  #                 environment: staging
+  #                 cdn_directory: spg/creditmemo
+  #                 flag_project_id: react-spa
+  #		    flag_id: fflag_mfe_synthia
+
+  #         - stage: approval_production_stage
+  #           dependsOn: rollout_staging_stage
+  #           displayName: Production approval
+  #           jobs:
+  #             - job: waitForValidation
+  #               displayName: Wait for external validation
+  #               pool: server
+  #               timeoutInMinutes: 4320 # job times out in 3 days
+  #               steps:
+  #                 - task: ManualValidation@0
+  #                   timeoutInMinutes: 1440 # task times out in 1 day
+  #                   inputs:
+  #                     notifyUsers: |
+  #                       synthiamfe_approvers@spglobal.com
+  #                     instructions: 'Please validate the build configuration and resume'
+
+  #         - stage: rollout_production_stage
+  #           dependsOn: approval_production_stage
+  #           displayName: Production rollout
+  #           jobs:
+  #             - template: deploy/cdn.v1.yml@mfe-infra
+  #               parameters:
+  #                 environment: production
+  #                 cdn_directory: spg/creditmemo
+  #                 flag_project_id: react-spa
+  #                 flag_id: fflag_mfe_synthia
+
 export const downloadReport = async (fileId: string): Promise<any> => {
   try {
       //let url = getApiRootPath();

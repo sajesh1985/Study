@@ -1,3 +1,5 @@
+display: flex;justify-content: center;margin-top: 4px;font-size: 12px;
+
 <div class="StyledGenerateInfoBlock css-3m3o7h" style="
     /* max-width: 433px; */ /* Adjust width for smaller screens */
     white-space: unset;

@@ -1,3 +1,13 @@
+main.js:1230  Uncaught Error: Shared module is not available for eager consumption: webpack/sharing/consume/default/react/react
+    at __webpack_require__.m.<computed> (main.js:1230:54)
+    at __webpack_require__ (main.js:373:32)
+    at fn (main.js:743:21)
+    at eval (index.js:2:63)
+    at ./src/index.js (main.js:322:1)
+    at __webpack_require__ (main.js:373:32)
+    at main.js:1855:37
+    at main.js:1857:12
+
 <div data-rbd-droppable-id="section1" data-rbd-droppable-context-id="1" style="border: 1px solid gray; padding: 1rem; width: 200px; min-height: 200px;"><h4>Available Items</h4><div data-rbd-draggable-context-id="1" data-rbd-draggable-id="item-1" tabindex="0" role="button" aria-describedby="rbd-hidden-text-1-hidden-text-1" data-rbd-drag-handle-draggable-id="item-1" data-rbd-drag-handle-context-id="1" draggable="false" style="padding: 8px; margin: 4px 0px; background-color: rgb(238, 238, 238);">Item 1</div><div data-rbd-draggable-context-id="1" data-rbd-draggable-id="item-2" tabindex="0" role="button" aria-describedby="rbd-hidden-text-1-hidden-text-1" data-rbd-drag-handle-draggable-id="item-2" data-rbd-drag-handle-context-id="1" draggable="false" style="padding: 8px; margin: 4px 0px; background-color: rgb(238, 238, 238);">Item 2</div><div data-rbd-draggable-context-id="1" data-rbd-draggable-id="item-3" tabindex="0" role="button" aria-describedby="rbd-hidden-text-1-hidden-text-1" data-rbd-drag-handle-draggable-id="item-3" data-rbd-drag-handle-context-id="1" draggable="false" style="padding: 8px; margin: 4px 0px; background-color: rgb(238, 238, 238);">Item 3</div></div>
 
 const handleGo = async () => {

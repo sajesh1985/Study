@@ -1,3 +1,45 @@
+export function useGenerateExportPayload(exportType: ExportType,data:any){
+    const fileName = useSelector((state: any) => state.export.fileName);
+    
+    const rows: Row[] = [];
+   //const emptyRow: Cell[] = [new CellBuilder().withContent('').build()];
+
+    const firstRow: Cell[] = [new CellBuilder()
+                .withContent('CreditStats Direct® Source: S&P Global Ratings | Financial Benchmarks Source: S&P Global Market Intelligence')
+                .build()]
+            rows.push(row(firstRow));
+
+
+  const tableRows: Row[] = dataToRows(data);
+  
+  //const LiquidityScoreChartRow = useGenerateLiquidityChartSchemaForPrint(exportType);
+  const LiquidityScoreChartRow = chartWidget('chartName', fileName, exportType);
+  const combinedRows: Row[] = [...rows,...tableRows,...LiquidityScoreChartRow];
+
+  const reportTable: Table = getTable(combinedRows, 'pageContainer');
+
+  const report: Report = new ReportHelper()
+    .withTitle('CreditMemo Report')
+    .withBrowserTitle('CreditMemo Report')
+    .withUserProfileTypeSelected(3)
+    .withSheetName('Details')
+    .withReportTable(reportTable)
+    .build();
+
+    const exportable = new ExportableHelper()
+    .withSchemaType('UserFriendly')
+    .withFormat(exportType)
+    .withReports([report]);
+
+  exportType !== 'excel'
+    ? exportable.withCulture('en-US')
+    : '';
+
+  const payload: Exportable = exportable.build();
+
+  return payload;
+};
+
 main.js:1230  Uncaught Error: Shared module is not available for eager consumption: webpack/sharing/consume/default/react/react
     at __webpack_require__.m.<computed> (main.js:1230:54)
     at __webpack_require__ (main.js:373:32)

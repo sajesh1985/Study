@@ -1,4 +1,7 @@
- const approveHeaders: any = {
+{"chart":{"type":"column","height":500},"title":{"text":"Amazon.com, Inc. - Revenue, EBITDA and Margins","style":{"fontSize":"16px"}},"xAxis":{"title":{"text":"Fiscal Year","style":{"fontSize":"12px"}},"categories":["2021","2022","2023"]},"yAxis":[{"title":{"text":"Amount ($M)","style":{"color":"#24829a","fontSize":"12px"}},"labels":{"style":{"fontSize":"12px"},"format":"${value}M"}},{"title":{"text":"Margin (%)","style":{"color":"#f1a649","fontSize":"12px"}},"labels":{"style":{"fontSize":"12px"},"format":"{value}%"},"opposite":true}],"legend":{"enabled":true,"itemStyle":{"fontSize":"12px"}},"series":[{"data":[469822,513983,574785],"name":"Revenue","type":"column","color":"#24829a","yAxis":0,"tooltip":{"valuePrefix":"$","valueSuffix":"M"}},{"data":[59312,55269,85515],"name":"EBITDA","type":"column","color":"#31ac8d","yAxis":0,"tooltip":{"valuePrefix":"$","valueSuffix":"M"}},{"data":[33364,-2722,30425],"name":"Net Income","type":"column","color":"#9f60a4","yAxis":0,"tooltip":{"valuePrefix":"$","valueSuffix":"M"}},{"data":[12.6,10.8,14.9],"name":"EBITDA Margin","type":"line","color":"#f1a649","yAxis":1,"marker":{"enabled":true},"tooltip":{"valuePrefix":"","valueSuffix":"%"}},{"data":[7.1,-0.5,5.3],"name":"Net Income Margin","type":"line","color":"#cd6083","yAxis":1,"marker":{"enabled":true},"tooltip":{"valuePrefix":"","valueSuffix":"%"}}],"credits":{"enabled":false},"tooltip":{"shared":true,"valuePrefix":"$","valueSuffix":"M","valueDecimals":1},"subtitle":{"text":"2021-2023","style":{"fontSize":"12px"}},"plotOptions":{"line":{"dataLabels":{"style":{"fontSize":"12px"},"format":"{y:.1f}%","enabled":true}},"column":{"dataLabels":{"style":{"fontSize":"12px"},"format":"${y:,.0f}M","enabled":true}}}}
+
+
+const approveHeaders: any = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${tokenSt.replace(/^Bearer\s+/i, '')}`
       };
@@ -516,4 +519,5 @@ export const Chat: React.FC = () => {
     </Page>
   );
 };
+
 

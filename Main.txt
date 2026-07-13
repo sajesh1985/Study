@@ -1,0 +1,1137 @@
+USE [Product_SNLServiceModules]
+GO
+/****** Object:  StoredProcedure [dbo].[AI_CreditMemo_CSD_Reconciliation_prc]    Script Date: 7/13/2026 1:15:49 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+-- ==============================================================================================
+/*
+ Author       : RD-A team (Lalitya Venkat Yanaganti and Meharsh Gohadkar and Sajesh Nambiar)
+ Create date  : 16/04/2026
+ Description  : Optimised Reconciliation procedure exposing the HYDROB reconciliation
+                source metric set in TALL format.
+                Result is returned in TALL (unpivoted) format:
+                  one row per metric per period, with a simplified output schema for agent/LLM consumption:
+                    MetricName | MetricValue | FiscalYear | FiscalPeriodGAAP |
+                    PeriodDateEnded | CurrencyCode | MagnitudeMultiplier | RatingReviewStatus
+
+ Parameters   :
+   @KeyInstn            INT            - Institution key
+   @InquiryPeriodValue  NVARCHAR(1000) - Comma-separated period list (e.g. N'2018Q3,2017Y,2016Y')
+   @IsAdjusted          BIT            - 1 = Adjusted (default), 0 = Pre-Adjusted
+
+ Examples
+   -- Corporate, Pre-Adjusted
+   EXEC dbo.AI_CreditMemo_CSD_Reconciliation_prc 4000193, N'2025Y,2024Y,2023Y', 0
+
+   -- Corporate, Adjusted
+   EXEC dbo.AI_CreditMemo_CSD_Reconciliation_prc 4000193, N'2025Y,2024Y,2023Y', 1
+*/
+-- ==============================================================================================
+
+ALTER PROCEDURE [dbo].[AI_CreditMemo_CSD_Reconciliation_prc]
+(
+    @KeyInstn           INT = 0,
+    @InquiryPeriodValue NVARCHAR(1000),
+    @IsAdjusted         BIT = 1
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ResultTable TABLE (SectorValue INT);
+    DECLARE @SectorValue INT;
+    DECLARE @SourceType NVARCHAR(10);
+
+    INSERT INTO @ResultTable
+    EXEC dbo.AI_CreditMemo_GetSectorValueCSDFinancial_prc @KeyInstn;
+
+    SELECT @SectorValue = SectorValue
+    FROM @ResultTable;
+
+    SELECT @SectorValue AS SectorValue;
+
+	DECLARE @MetricDictionary TABLE
+	(
+		MetricName NVARCHAR(100),
+		GroupName  NVARCHAR(100)
+	);
+	
+	INSERT INTO @MetricDictionary (MetricName, GroupName)
+VALUES
+    ('CIQ048400', 'DEBT'),
+    ('CIQ048437', 'DEBT'),
+    ('ReportedLeaseLiabilitiesDebt', 'DEBT|Total Adjustments'),
+	('CIQ048407', 'DEBT|Total Adjustments'),
+	('CIQ048408', 'DEBT|Total Adjustments'),
+	('CIQ048409', 'DEBT|Total Adjustments'),
+	('CIQ048414', 'DEBT|Total Adjustments'),
+	('CIQ048431', 'DEBT|Total Adjustments'),
+	('CIQ048438', 'DEBT'),
+	('CIQ048439', 'EQUITY'),
+	('CIQ048445', 'EQUITY'),
+	('CIQ048452', 'EQUITY|Total Adjustments'),
+	('CIQ048447', 'EQUITY|Total Adjustments'),
+	('CIQ048453', 'EQUITY'),
+	('CIQ048454', 'REVENUES'),
+	('CIQ048462', 'REVENUES'),
+	('CIQ048455', 'REVENUES|Total Adjustments'),
+	('CIQ048463', 'REVENUES'),
+	('CIQ048464', 'EBITDA'),
+	('CIQ048512', 'EBITDA'),
+	('CIQ048466', 'EBITDA|Total Adjustments'),
+	('CIQ048473', 'EBITDA|Total Adjustments'),
+	('CIQ048471', 'EBITDA|Total Adjustments'),
+	('CIQ048511', 'EBITDA|Total Adjustments'),
+	('CIQ048513', 'EBITDA'),
+	('CIQ048514', 'EBIT'),
+	('CIQ048567', 'EBIT'),
+	('CIQ048516', 'EBIT|Total Adjustments'),
+	('CIQ048521', 'EBIT|Total Adjustments'),
+	('CIQ048526', 'EBIT|Total Adjustments'),
+	('CIQ048559', 'EBIT|Total Adjustments'),
+	('CIQ048568', 'EBIT'),
+	('CIQ048569', 'INTEREST EXPENSE'),
+	('CIQ048589', 'INTEREST EXPENSE'),
+	('CIQ048571', 'INTEREST EXPENSE|Total Adjustments'),
+	('CIQ048577', 'INTEREST EXPENSE|Total Adjustments'),
+	('CIQ048578', 'INTEREST EXPENSE|Total Adjustments'),
+	('CIQ048590', 'INTEREST EXPENSE'),
+	('CIQ048591', 'Funds From Operations (FFO)'),
+	('CIQ048653', 'Funds From Operations (FFO)'),
+	('CashTaxesPaidEarning', 'Funds From Operations (FFO)|Total Adjustments'),
+	('CashInterestPaid', 'Funds From Operations (FFO)|Total Adjustments'),
+	('CIQ048596', 'Funds From Operations (FFO)|Total Adjustments'),
+	('CIQ048602', 'Funds From Operations (FFO)|Total Adjustments'),
+	('CIQ048607', 'Funds From Operations (FFO)|Total Adjustments'),
+	('CIQ048654', 'Funds From Operations (FFO)'),
+	('CIQ048655', 'CASH FLOW FROM OPERATIONS'),
+	('CIQ048686', 'CASH FLOW FROM OPERATIONS'),
+	('CIQ048657', 'CASH FLOW FROM OPERATIONS|Total Adjustments'),
+	('CIQ048663', 'CASH FLOW FROM OPERATIONS|Total Adjustments'),
+	('CIQ048687', 'CASH FLOW FROM OPERATIONS'),
+	('CIQ048688', 'DIVIDENDS'),
+	('CIQ048689', 'DIVIDENDS'),
+	('CIQ048696', 'DIVIDENDS'),
+	('CIQ048697', 'CAPITAL EXPENDITURES'),
+	('CIQ048698', 'CAPITAL EXPENDITURES'),
+	('CIQ048707', 'CAPITAL EXPENDITURES|Total Adjustments'),
+	('CIQ048708', 'CAPITAL EXPENDITURES');
+    IF @SectorValue = 0
+    BEGIN
+        SET @SourceType = N'CORP';
+    END
+    ELSE IF @SectorValue = 1
+    BEGIN
+        SET @SourceType = N'FI';
+    END
+    ELSE IF @SectorValue = 2
+    BEGIN
+        SET @SourceType = N'INS';
+    END
+    ELSE
+    BEGIN
+        SET @SourceType = N'CORP';
+    END;
+
+    SELECT
+        [str] AS DataSourcePeriod,
+        SUBSTRING([str], 1, 4) AS FiscalYear,
+        CASE
+            WHEN SUBSTRING([str], 5, 6) = 'Q1' THEN '1'
+            WHEN SUBSTRING([str], 5, 6) = 'Q2' THEN '2'
+            WHEN SUBSTRING([str], 5, 6) = 'Q3' THEN '3'
+            WHEN SUBSTRING([str], 5, 6) = 'Q4' THEN '4'
+            WHEN SUBSTRING([str], 5, 6) = 'H1' THEN 'F'
+            WHEN SUBSTRING([str], 5, 6) = 'H2' THEN 'H'
+            WHEN SUBSTRING([str], 5, 6) = 'L' THEN 'L'
+            ELSE 'Y'
+        END AS FiscalQuarter,
+        listpos
+    INTO #tempdatasource
+    FROM dbo.Iter_charlist_to_table(@InquiryPeriodValue, ',');
+
+    CREATE INDEX IX_tds ON #tempdatasource (listpos);
+
+    SELECT
+        DataSourcePeriod,
+        FiscalYear,
+        FiscalQuarter,
+        CASE
+            WHEN DataSourcePeriod LIKE '%Y%' THEN 'FY'
+            WHEN DataSourcePeriod LIKE '%Q1' THEN 'FQ1'
+            WHEN DataSourcePeriod LIKE '%Q2' THEN 'FQ2'
+            WHEN DataSourcePeriod LIKE '%Q3' THEN 'FQ3'
+            WHEN DataSourcePeriod LIKE '%Q4' THEN 'FQ4'
+            WHEN DataSourcePeriod LIKE '%L' THEN 'LTM'
+            WHEN DataSourcePeriod LIKE '%H1' THEN 'FH1'
+            WHEN DataSourcePeriod LIKE '%H2' THEN 'FH2'
+        END AS FiscalPeriodGAAP,
+        FiscalYear AS DateField,
+        listpos
+    INTO #tempdatasource_Final
+    FROM #tempdatasource;
+
+    CREATE INDEX IX_tdsf ON #tempdatasource_Final (DateField, FiscalQuarter, listpos);
+
+    IF UPPER(@SourceType) = N'CORP' AND @IsAdjusted = 0
+    BEGIN
+        ;WITH src AS
+        (
+            SELECT DISTINCT
+                feop.CIQ048400 AS CIQ048400,
+                feop.CIQ048401 AS CIQ048401,
+                feop.CIQ048402 AS CIQ048402,
+                feop.CIQ048403 AS CIQ048403,
+                feop.CIQ048404 AS CIQ048404,
+                feop.CIQ048405 AS CIQ048405,
+                feop.CIQ048406 AS CIQ048406,
+                feop.CIQ048407 AS CIQ048407,
+                feop.CIQ048408 AS CIQ048408,
+                feop.CIQ048409 AS CIQ048409,
+                feop.CIQ048410 AS CIQ048410,
+                feop.CIQ048412 AS CIQ048412,
+                feop.CIQ048413 AS CIQ048413,
+                feop.CIQ048414 AS CIQ048414,
+                feop.CIQ048416 AS CIQ048416,
+                feop.CIQ048417 AS CIQ048417,
+                feop.CIQ048418 AS CIQ048418,
+                feop.CIQ048419 AS CIQ048419,
+                feop.CIQ048421 AS CIQ048421,
+                feop.CIQ048422 AS CIQ048422,
+                feop.CIQ048423 AS CIQ048423,
+                feop.CIQ048424 AS CIQ048424,
+                feop.CIQ048425 AS CIQ048425,
+                ISNULL(feop.CIQ048426, 0) AS CIQ048426,
+                ISNULL(feop.CIQ048427, 0) AS CIQ048427,
+                ISNULL(feop.CIQ048428, 0) AS CIQ048428,
+                ISNULL(feop.CIQ048429, 0) AS CIQ048429,
+                ISNULL(feop.CIQ048431, 0) AS CIQ048431,
+                ISNULL(feop.CIQ048433, 0) AS CIQ048433,
+                ISNULL(feop.CIQ048434, 0) AS CIQ048434,
+                ISNULL(feop.CIQ048435, 0) AS CIQ048435,
+                ISNULL(feop.CIQ048436, 0) AS CIQ048436,
+                ISNULL(feop.CIQ048437, 0) AS CIQ048437,
+                ISNULL(feop.CIQ048438, 0) AS CIQ048438,
+                ISNULL(feop.CIQ048439, 0) AS CIQ048439,
+                ISNULL(feop.CIQ048440, 0) AS CIQ048440,
+                ISNULL(feop.CIQ048441, 0) AS CIQ048441,
+                ISNULL(feop.CIQ048442, 0) AS CIQ048442,
+                ISNULL(feop.CIQ048443, 0) AS CIQ048443,
+                ISNULL(feop.CIQ048445, 0) AS CIQ048445,
+                ISNULL(feop.CIQ048446, 0) AS CIQ048446,
+                ISNULL(feop.CIQ048447, 0) AS CIQ048447,
+                ISNULL(feop.CIQ048448, 0) AS CIQ048448,
+                ISNULL(feop.CIQ048449, 0) AS CIQ048449,
+                ISNULL(feop.CIQ048451, 0) AS CIQ048451,
+                ISNULL(feop.CIQ048452, 0) AS CIQ048452,
+                ISNULL(feop.CIQ048453, 0) AS CIQ048453,
+                ISNULL(feop.CIQ049753, 0) AS CIQ049753,
+                ISNULL(feop.CIQ049754, 0) AS CIQ049754,
+                ISNULL(feop.CIQ049755, 0) AS CIQ049755,
+                ISNULL(feop.CIQ049756, 0) AS CIQ049756,
+                ISNULL(feop.CIQ049757, 0) AS CIQ049757,
+                ISNULL(feop.CIQ049758, 0) AS CIQ049758,
+                ISNULL(feop.CIQ049759, 0) AS CIQ049759,
+                ISNULL(feop.CIQ049760, 0) AS CIQ049760,
+                ISNULL(feop.CIQ049761, 0) AS CIQ049761,
+                ISNULL(feop.CIQ049762, 0) AS CIQ049762,
+                ISNULL(fif1.CIQ048454, 0) AS CIQ048454,
+                ISNULL(fif1.CIQ048455, 0) AS CIQ048455,
+                ISNULL(fif1.CIQ048456, 0) AS CIQ048456,
+                ISNULL(fif1.CIQ048457, 0) AS CIQ048457,
+                ISNULL(fif1.CIQ048458, 0) AS CIQ048458,
+                ISNULL(fif1.CIQ048459, 0) AS CIQ048459,
+                ISNULL(fif1.CIQ048460, 0) AS CIQ048460,
+                ISNULL(fif1.CIQ048461, 0) AS CIQ048461,
+                ISNULL(fif1.CIQ048462, 0) AS CIQ048462,
+                ISNULL(fif1.CIQ048463, 0) AS CIQ048463,
+                ISNULL(fif1.CIQ048464, 0) AS CIQ048464,
+                ISNULL(fif1.CIQ048466, 0) AS CIQ048466,
+                ISNULL(fif1.CIQ048467, 0) AS CIQ048467,
+                ISNULL(fif1.CIQ048468, 0) AS CIQ048468,
+                ISNULL(fif1.CIQ048469, 0) AS CIQ048469,
+                ISNULL(fif1.CIQ048471, 0) AS CIQ048471,
+                ISNULL(fif1.CIQ048472, 0) AS CIQ048472,
+                ISNULL(fif1.CIQ048473, 0) AS CIQ048473,
+                ISNULL(fif1.CIQ048474, 0) AS CIQ048474,
+                ISNULL(fif1.CIQ048475, 0) AS CIQ048475,
+                ISNULL(fif1.CIQ048476, 0) AS CIQ048476,
+                ISNULL(fif1.CIQ048477, 0) AS CIQ048477,
+                ISNULL(fif1.CIQ048478, 0) AS CIQ048478,
+                ISNULL(fif1.CIQ048479, 0) AS CIQ048479,
+                ISNULL(fif1.CIQ048480, 0) AS CIQ048480,
+                ISNULL(fif1.CIQ048481, 0) AS CIQ048481,
+                ISNULL(fif1.CIQ048482, 0) AS CIQ048482,
+                ISNULL(fif1.CIQ048486, 0) AS CIQ048486,
+                ISNULL(fif1.CIQ048500, 0) AS CIQ048500,
+                ISNULL(fif1.CIQ048501, 0) AS CIQ048501,
+                ISNULL(fif1.CIQ048502, 0) AS CIQ048502,
+                ISNULL(fif1.CIQ048503, 0) AS CIQ048503,
+                ISNULL(fif1.CIQ048504, 0) AS CIQ048504,
+                ISNULL(fif1.CIQ048505, 0) AS CIQ048505,
+                ISNULL(fif1.CIQ048506, 0) AS CIQ048506,
+                ISNULL(fif1.CIQ048507, 0) AS CIQ048507,
+                ISNULL(fif1.CIQ048508, 0) AS CIQ048508,
+                ISNULL(fif1.CIQ048509, 0) AS CIQ048509,
+                ISNULL(fif1.CIQ048510, 0) AS CIQ048510,
+                ISNULL(fif1.CIQ048511, 0) AS CIQ048511,
+                ISNULL(fif1.CIQ048512, 0) AS CIQ048512,
+                ISNULL(fif1.CIQ048513, 0) AS CIQ048513,
+                ISNULL(fif1.CIQ048514, 0) AS CIQ048514,
+                ISNULL(fif1.CIQ048516, 0) AS CIQ048516,
+                ISNULL(fif1.CIQ048517, 0) AS CIQ048517,
+                ISNULL(fif1.CIQ048518, 0) AS CIQ048518,
+                ISNULL(fif1.CIQ048519, 0) AS CIQ048519,
+                ISNULL(fif1.CIQ048521, 0) AS CIQ048521,
+                ISNULL(fif1.CIQ048522, 0) AS CIQ048522,
+                ISNULL(fif1.CIQ048523, 0) AS CIQ048523,
+                ISNULL(fif1.CIQ048524, 0) AS CIQ048524,
+                ISNULL(fif1.CIQ048525, 0) AS CIQ048525,
+                ISNULL(fif1.CIQ048526, 0) AS CIQ048526,
+                ISNULL(fif1.CIQ048527, 0) AS CIQ048527,
+                ISNULL(fif1.CIQ048528, 0) AS CIQ048528,
+                ISNULL(fif1.CIQ048529, 0) AS CIQ048529,
+                ISNULL(fif1.CIQ048530, 0) AS CIQ048530,
+                ISNULL(fif1.CIQ048534, 0) AS CIQ048534,
+                ISNULL(fif1.CIQ048548, 0) AS CIQ048548,
+                ISNULL(fif1.CIQ048549, 0) AS CIQ048549,
+                ISNULL(fif1.CIQ048550, 0) AS CIQ048550,
+                ISNULL(fif1.CIQ048551, 0) AS CIQ048551,
+                ISNULL(fif1.CIQ048552, 0) AS CIQ048552,
+                ISNULL(fif1.CIQ048553, 0) AS CIQ048553,
+                ISNULL(fif1.CIQ048554, 0) AS CIQ048554,
+                ISNULL(fif1.CIQ048555, 0) AS CIQ048555,
+                ISNULL(fif1.CIQ048556, 0) AS CIQ048556,
+                ISNULL(fif1.CIQ048557, 0) AS CIQ048557,
+                ISNULL(fif1.CIQ048558, 0) AS CIQ048558,
+                ISNULL(fif1.CIQ048559, 0) AS CIQ048559,
+                ISNULL(fif1.CIQ048560, 0) AS CIQ048560,
+                ISNULL(fif1.CIQ048561, 0) AS CIQ048561,
+                ISNULL(fif1.CIQ048562, 0) AS CIQ048562,
+                ISNULL(fif1.CIQ048563, 0) AS CIQ048563,
+                ISNULL(fif1.CIQ048564, 0) AS CIQ048564,
+                ISNULL(fif1.CIQ048566, 0) AS CIQ048566,
+                ISNULL(fif1.CIQ048567, 0) AS CIQ048567,
+                ISNULL(fif1.CIQ048568, 0) AS CIQ048568,
+                ISNULL(fif1.CIQ048569, 0) AS CIQ048569,
+                ISNULL(fif1.CIQ048571, 0) AS CIQ048571,
+                ISNULL(fif1.CIQ048572, 0) AS CIQ048572,
+                ISNULL(fif1.CIQ048573, 0) AS CIQ048573,
+                ISNULL(fif1.CIQ048574, 0) AS CIQ048574,
+                ISNULL(fif1.CIQ048575, 0) AS CIQ048575,
+                ISNULL(fif1.CIQ048576, 0) AS CIQ048576,
+                ISNULL(fif1.CIQ048577, 0) AS CIQ048577,
+                ISNULL(fif1.CIQ048578, 0) AS CIQ048578,
+                ISNULL(fif1.CIQ048579, 0) AS CIQ048579,
+                ISNULL(fif1.CIQ048581, 0) AS CIQ048581,
+                ISNULL(fif1.CIQ048582, 0) AS CIQ048582,
+                ISNULL(fif1.CIQ048583, 0) AS CIQ048583,
+                ISNULL(fif1.CIQ048584, 0) AS CIQ048584,
+                ISNULL(fif1.CIQ048585, 0) AS CIQ048585,
+                ISNULL(fif1.CIQ048586, 0) AS CIQ048586,
+                ISNULL(fif1.CIQ048587, 0) AS CIQ048587,
+                ISNULL(fif1.CIQ048588, 0) AS CIQ048588,
+                ISNULL(fif1.CIQ048589, 0) AS CIQ048589,
+                ISNULL(fif1.CIQ048590, 0) AS CIQ048590,
+                ISNULL(fif1.CIQ048591, 0) AS CIQ048591,
+                ISNULL(fif1.CIQ048596, 0) AS CIQ048596,
+                ISNULL(fif1.CIQ048597, 0) AS CIQ048597,
+                ISNULL(fif1.CIQ048598, 0) AS CIQ048598,
+                ISNULL(fif1.CIQ048599, 0) AS CIQ048599,
+                ISNULL(fif1.CIQ048600, 0) AS CIQ048600,
+                ISNULL(fif1.CIQ048602, 0) AS CIQ048602,
+                ISNULL(fif1.CIQ048607, 0) AS CIQ048607,
+                ISNULL(fif1.CIQ048608, 0) AS CIQ048608,
+                ISNULL(fif1.CIQ048610, 0) AS CIQ048610,
+                ISNULL(fif1.CIQ048611, 0) AS CIQ048611,
+                ISNULL(fif1.CIQ048613, 0) AS CIQ048613,
+                ISNULL(fif1.CIQ048652, 0) AS CIQ048652,
+                ISNULL(fif1.CIQ048653, 0) AS CIQ048653,
+                ISNULL(fif1.CIQ048654, 0) AS CIQ048654,
+                ISNULL(fif1.CIQ048655, 0) AS CIQ048655,
+                ISNULL(fif1.CIQ048656, 0) AS CIQ048656,
+                ISNULL(fif1.CIQ048657, 0) AS CIQ048657,
+                ISNULL(fif1.CIQ048658, 0) AS CIQ048658,
+                ISNULL(fif1.CIQ048659, 0) AS CIQ048659,
+                ISNULL(fif1.CIQ048660, 0) AS CIQ048660,
+                ISNULL(fif1.CIQ048661, 0) AS CIQ048661,
+                ISNULL(fif1.CIQ048663, 0) AS CIQ048663,
+                ISNULL(fif1.CIQ048664, 0) AS CIQ048664,
+                ISNULL(fif1.CIQ048666, 0) AS CIQ048666,
+                ISNULL(fif1.CIQ048667, 0) AS CIQ048667,
+                ISNULL(fif1.CIQ048668, 0) AS CIQ048668,
+                ISNULL(fif1.CIQ048669, 0) AS CIQ048669,
+                ISNULL(fif1.CIQ048671, 0) AS CIQ048671,
+                ISNULL(fif1.CIQ048672, 0) AS CIQ048672,
+                ISNULL(fif1.CIQ048673, 0) AS CIQ048673,
+                ISNULL(fif1.CIQ048675, 0) AS CIQ048675,
+                ISNULL(fif1.CIQ048676, 0) AS CIQ048676,
+                ISNULL(fif1.CIQ048677, 0) AS CIQ048677,
+                ISNULL(fif1.CIQ048679, 0) AS CIQ048679,
+                ISNULL(fif1.CIQ048680, 0) AS CIQ048680,
+                ISNULL(fif1.CIQ048681, 0) AS CIQ048681,
+                ISNULL(fif1.CIQ048682, 0) AS CIQ048682,
+                ISNULL(fif1.CIQ048683, 0) AS CIQ048683,
+                ISNULL(fif1.CIQ048684, 0) AS CIQ048684,
+                ISNULL(fif1.CIQ048685, 0) AS CIQ048685,
+                ISNULL(fif1.CIQ048686, 0) AS CIQ048686,
+                ISNULL(fif1.CIQ048687, 0) AS CIQ048687,
+                ISNULL(fif1.CIQ048688, 0) AS CIQ048688,
+                ISNULL(fif1.CIQ048689, 0) AS CIQ048689,
+                ISNULL(fif1.CIQ048690, 0) AS CIQ048690,
+                ISNULL(fif1.CIQ048691, 0) AS CIQ048691,
+                ISNULL(fif1.CIQ048692, 0) AS CIQ048692,
+                ISNULL(fif1.CIQ048693, 0) AS CIQ048693,
+                ISNULL(fif1.CIQ048694, 0) AS CIQ048694,
+                ISNULL(fif1.CIQ048695, 0) AS CIQ048695,
+                ISNULL(fif1.CIQ048696, 0) AS CIQ048696,
+                ISNULL(fif1.CIQ048697, 0) AS CIQ048697,
+                ISNULL(fif1.CIQ048698, 0) AS CIQ048698,
+                ISNULL(fif1.CIQ048699, 0) AS CIQ048699,
+                ISNULL(fif1.CIQ048701, 0) AS CIQ048701,
+                ISNULL(fif1.CIQ048702, 0) AS CIQ048702,
+                ISNULL(fif1.CIQ048703, 0) AS CIQ048703,
+                ISNULL(fif1.CIQ048704, 0) AS CIQ048704,
+                ISNULL(fif1.CIQ048705, 0) AS CIQ048705,
+                ISNULL(fif1.CIQ048706, 0) AS CIQ048706,
+                ISNULL(fif1.CIQ048707, 0) AS CIQ048707,
+                ISNULL(fif1.CIQ048708, 0) AS CIQ048708,
+                ISNULL(fif2.CIQ049763, 0) AS CIQ049763,
+                ISNULL(fif2.CIQ049764, 0) AS CIQ049764,
+                ISNULL(fif2.CIQ049765, 0) AS CIQ049765,
+                ISNULL(fif2.CIQ049766, 0) AS CIQ049766,
+                ISNULL(fif2.CIQ049767, 0) AS CIQ049767,
+                ISNULL(fif2.CIQ049768, 0) AS CIQ049768,
+                ISNULL(fif2.CIQ049769, 0) AS CIQ049769,
+                ISNULL(fif2.CIQ049770, 0) AS CIQ049770,
+                ISNULL(fif2.CIQ049771, 0) AS CIQ049771,
+                ISNULL(fif2.CIQ049772, 0) AS CIQ049772,
+                ISNULL(fif2.CIQ049773, 0) AS CIQ049773,
+                ISNULL(fif2.CIQ049774, 0) AS CIQ049774,
+                ISNULL(fif2.CIQ049775, 0) AS CIQ049775,
+                ISNULL(fif2.CIQ049776, 0) AS CIQ049776,
+                ISNULL(fif2.CIQ049777, 0) AS CIQ049777,
+                ISNULL(fif2.CIQ049778, 0) AS CIQ049778,
+                ISNULL(fif2.CIQ049779, 0) AS CIQ049779,
+                ISNULL(fif2.CIQ049780, 0) AS CIQ049780,
+                ISNULL(fif2.CIQ049781, 0) AS CIQ049781,
+                ISNULL(fif2.CIQ049782, 0) AS CIQ049782,
+                ISNULL(fif2.CIQ049783, 0) AS CIQ049783,
+                ISNULL(fif2.CIQ049784, 0) AS CIQ049784,
+                ISNULL(fif2.CIQ049785, 0) AS CIQ049785,
+                ISNULL(fif2.CIQ049787, 0) AS CIQ049787,
+                ISNULL(fif2.CIQ049789, 0) AS CIQ049789,
+                ISNULL(fif2.CIQ049790, 0) AS CIQ049790,
+                ISNULL(fif2.CIQ050045, 0) AS CIQ050045,
+                ISNULL(fif2.CIQ049791, 0) AS CIQ049791,
+                ISNULL(fif2.CIQ049792, 0) AS CIQ049792,
+                ISNULL(fif2.CIQ049793, 0) AS CIQ049793,
+                ISNULL(fif2.CIQ049794, 0) AS CIQ049794,
+                ISNULL(fif2.CIQ049795, 0) AS CIQ049795,
+                ISNULL(fif2.CIQ049796, 0) AS CIQ049796,
+                ISNULL(fif2.CIQ049797, 0) AS CIQ049797,
+                ISNULL(fif2.CIQ049798, 0) AS CIQ049798,
+                ISNULL(fif2.CIQ049799, 0) AS CIQ049799,
+                ISNULL(fif2.CIQ049800, 0) AS CIQ049800,
+                ISNULL(fif2.CIQ049801, 0) AS CIQ049801,
+                ISNULL(fif2.CIQ049802, 0) AS CIQ049802,
+                ISNULL(fif2.CIQ049803, 0) AS CIQ049803,
+                ISNULL(fif2.CIQ049804, 0) AS CIQ049804,
+                ISNULL(fif2.CIQ049805, 0) AS CIQ049805,
+                ISNULL(fif2.CIQ049806, 0) AS CIQ049806,
+                ISNULL(fif2.CIQ049807, 0) AS CIQ049807,
+                ISNULL(fif2.CIQ049808, 0) AS CIQ049808,
+                ISNULL(fif2.CIQ049809, 0) AS CIQ049809,
+                ISNULL(fif2.CIQ049810, 0) AS CIQ049810,
+                ISNULL(fif2.CIQ049812, 0) AS CIQ049812,
+                ISNULL(fif2.CIQ049814, 0) AS CIQ049814,
+                ISNULL(fif2.CIQ050046, 0) AS CIQ050046,
+                ISNULL(fif2.CIQ049815, 0) AS CIQ049815,
+                ISNULL(fif2.CIQ049816, 0) AS CIQ049816,
+                ISNULL(fif2.CIQ049817, 0) AS CIQ049817,
+                ISNULL(fif2.CIQ049819, 0) AS CIQ049819,
+                ISNULL(fif2.CIQ050047, 0) AS CIQ050047,
+                ISNULL(fif2.CIQ049820, 0) AS CIQ049820,
+                ISNULL(fif2.CIQ049821, 0) AS CIQ049821,
+                ISNULL(fif2.CIQ049822, 0) AS CIQ049822,
+                ISNULL(fif2.CIQ049823, 0) AS CIQ049823,
+                ISNULL(fif2.CIQ049844, 0) AS CIQ049844,
+                ISNULL(fif2.CIQ049845, 0) AS CIQ049845,
+                ISNULL(fif2.CIQ049846, 0) AS CIQ049846,
+                ISNULL(fif2.CIQ049847, 0) AS CIQ049847,
+                ISNULL(fif2.CIQ050048, 0) AS CIQ050048,
+                ISNULL(fif2.CIQ049825, 0) AS CIQ049825,
+                ISNULL(fif2.CIQ049826, 0) AS CIQ049826,
+                ISNULL(fif2.CIQ049827, 0) AS CIQ049827,
+                ISNULL(fif2.CIQ049828, 0) AS CIQ049828,
+                ISNULL(fif2.CIQ049824, 0) AS CIQ049824,
+                ISNULL(fif2.CIQ049829, 0) AS CIQ049829,
+                ISNULL(fif2.CIQ049830, 0) AS CIQ049830,
+                ISNULL(fif2.CIQ049831, 0) AS CIQ049831,
+                ISNULL(fif2.CIQ049832, 0) AS CIQ049832,
+                ISNULL(fif2.CIQ049833, 0) AS CIQ049833,
+                ISNULL(fif2.CIQ049839, 0) AS CIQ049839,
+                ISNULL(fif2.CIQ049834, 0) AS CIQ049834,
+                ISNULL(fif2.CIQ049835, 0) AS CIQ049835,
+                ISNULL(fif2.CIQ049836, 0) AS CIQ049836,
+                ISNULL(fif2.CIQ049837, 0) AS CIQ049837,
+                ISNULL(fif2.CIQ049838, 0) AS CIQ049838,
+                ISNULL(fif2.CIQ049841, 0) AS CIQ049841,
+                ISNULL(fif2.CIQ049842, 0) AS CIQ049842,
+                ISNULL(fif2.CIQ049843, 0) AS CIQ049843,
+                ISNULL(feop.ReportedLeaseLiabilitiesDebt, 0) AS ReportedLeaseLiabilitiesDebt,
+                ISNULL(feop.LeaseLiabAdjToDebt, 0) AS LeaseLiabAdjToDebt,
+                ISNULL(feop.MultiEmployerPensionPlanDebt, 0) AS MultiEmployerPensionPlanDebt,
+                ISNULL(fif1.IncrementalLeaseEarning, 0) AS IncrementalLeaseEarning,
+                ISNULL(fif1.IncomeUnconsolidatedCompany, 0) AS IncomeUnconsolidatedCompany,
+                ISNULL(fif1.IncrementalLeaseOpIncome, 0) AS IncrementalLeaseOpIncome,
+                ISNULL(fif1.IncrementalLeaseInterestExp, 0) AS IncrementalLeaseInterestExp,
+                ISNULL(fif1.CashTaxesPaidEarning, 0) AS CashTaxesPaidEarning,
+                ISNULL(fif1.CashTaxesPaidOtherEarning, 0) AS CashTaxesPaidOtherEarning,
+                ISNULL(fif1.CashInterestPaid, 0) AS CashInterestPaid,
+                ISNULL(fif1.CashInterestPaidOther, 0) AS CashInterestPaidOther,
+                ISNULL(fif1.IncremLeaseFundOperation, 0) AS IncremLeaseFundOperation,
+                ISNULL(fif1.IncrementalLeaseCashFlowOper, 0) AS IncrementalLeaseCashFlowOper,
+                period.FiscalYear,
+                period.FiscalQuarter,
+                tdsf.FiscalPeriodGAAP,
+                tdsf.listpos AS FormOrder,
+                feop.DateEnded AS PeriodDateEnded,
+                feop.KeyCurrency AS CurrencyCode,
+                '(' + ISNULL(RTRIM(lc.CurrencySymbol), '$') +
+                CASE lc.MagnitudeMultiplierDisplay
+                    WHEN 3 THEN '000'
+                    WHEN 6 THEN 'M'
+                    WHEN 9 THEN 'B'
+                    WHEN 12 THEN 'T'
+                    ELSE 'M'
+                END + ')' AS MagnitudeMultiplier,
+                CAST(NULL AS NVARCHAR(20)) AS RatingReviewStatus
+            FROM objectviews..SPGRCorpFIFinlEOP feop
+            INNER JOIN objectviews..SPGRCorpFIFinl fif1
+                ON fif1.KeySPGRCorpFIFinlEOP = feop.KeySPGRCorpFIFinlEOP
+            INNER JOIN objectviews..SPGRCorpFIFinl2 fif2
+                ON fif2.KeySPGRCorpFIFinlEOP = feop.KeySPGRCorpFIFinlEOP
+            INNER JOIN objectviews..SPGRCorpFIFinlPeriod period
+                ON fif1.KeySPGRCorpFIFinl = period.KeySPGRCorpFIFinl
+               AND fif2.KeySPGRCorpFIFinl = period.KeySPGRCorpFIFinl
+            INNER JOIN objectviews..RatingEntity re
+                ON re.KeyRatingEntity = feop.KeyRatingEntity
+            INNER JOIN #tempdatasource_Final tdsf
+                ON period.FiscalYear = tdsf.DateField
+               AND period.FiscalQuarter = tdsf.FiscalQuarter
+            LEFT JOIN objectviews..LookupCurrency lc
+                ON lc.KeyCurrency = feop.KeyCurrency
+            WHERE re.KeyInstn = @KeyInstn
+              AND re.KeyInstnRatingAgency = 3000325
+              AND re.KeySPGRCorpFISource = 0
+              AND re.IsPrimary = 1
+              AND re.OIDVENDOR IS NOT NULL
+              AND re.CSDData = 1
+        )
+        SELECT
+            CASE 
+                WHEN md.GroupName IS NOT NULL 
+                    THEN md.GroupName + '|' + m.MetricName
+                ELSE m.MetricName
+            END AS MetricName,
+            m.MetricValue,
+            src.FiscalYear,
+            src.FiscalPeriodGAAP,
+            src.PeriodDateEnded,
+            src.CurrencyCode,
+              CASE
+			-- Currency-scaled: first char of Magnitude is a known currency symbol
+			-- src.MagnitudeMultiplier already has correct symbol+scale e.g. (€M), (₹M), (£M)
+				WHEN EXISTS (
+					SELECT 1 FROM ObjectViews..LookupCurrency lc2
+					WHERE RTRIM(lc2.CurrencySymbol) = LEFT(RTRIM(lmi.Magnitude), 1)
+				)
+					THEN src.MagnitudeMultiplier                    -- ($M), (€M), (£M), (₹M)
+
+				-- Non-currency: %, x, bp — first char not a currency symbol
+				WHEN lmi.Magnitude IS NOT NULL
+					THEN '(' + RTRIM(lmi.Magnitude) + ')'           -- (%), (x), (bp)
+
+				-- No LiveMetaItem match: fallback
+				ELSE src.MagnitudeMultiplier                        -- ($M), (€M)
+			END AS MagnitudeMultiplier,
+            src.RatingReviewStatus
+        FROM src
+        CROSS APPLY
+        (
+            VALUES
+                ('CIQ048400', src.CIQ048400), ('CIQ048401', src.CIQ048401), ('CIQ048402', src.CIQ048402), ('CIQ048403', src.CIQ048403),
+                ('CIQ048404', src.CIQ048404), ('CIQ048405', src.CIQ048405), ('CIQ048406', src.CIQ048406), ('CIQ048407', src.CIQ048407),
+                ('CIQ048408', src.CIQ048408), ('CIQ048409', src.CIQ048409), ('CIQ048410', src.CIQ048410), ('CIQ048412', src.CIQ048412),
+                ('CIQ048413', src.CIQ048413), ('CIQ048414', src.CIQ048414), ('CIQ048416', src.CIQ048416), ('CIQ048417', src.CIQ048417),
+                ('CIQ048418', src.CIQ048418), ('CIQ048419', src.CIQ048419), ('CIQ048421', src.CIQ048421), ('CIQ048422', src.CIQ048422),
+                ('CIQ048423', src.CIQ048423), ('CIQ048424', src.CIQ048424), ('CIQ048425', src.CIQ048425), ('CIQ048426', src.CIQ048426),
+                ('CIQ048427', src.CIQ048427), ('CIQ048428', src.CIQ048428), ('CIQ048429', src.CIQ048429), ('CIQ048431', src.CIQ048431),
+                ('CIQ048433', src.CIQ048433), ('CIQ048434', src.CIQ048434), ('CIQ048435', src.CIQ048435), ('CIQ048436', src.CIQ048436),
+                ('CIQ048437', src.CIQ048437), ('CIQ048438', src.CIQ048438), ('CIQ048439', src.CIQ048439), ('CIQ048440', src.CIQ048440),
+                ('CIQ048441', src.CIQ048441), ('CIQ048442', src.CIQ048442), ('CIQ048443', src.CIQ048443), ('CIQ048445', src.CIQ048445),
+                ('CIQ048446', src.CIQ048446), ('CIQ048447', src.CIQ048447), ('CIQ048448', src.CIQ048448), ('CIQ048449', src.CIQ048449),
+                ('CIQ048451', src.CIQ048451), ('CIQ048452', src.CIQ048452), ('CIQ048453', src.CIQ048453), ('CIQ049753', src.CIQ049753),
+                ('CIQ049754', src.CIQ049754), ('CIQ049755', src.CIQ049755), ('CIQ049756', src.CIQ049756), ('CIQ049757', src.CIQ049757),
+                ('CIQ049758', src.CIQ049758), ('CIQ049759', src.CIQ049759), ('CIQ049760', src.CIQ049760), ('CIQ049761', src.CIQ049761),
+                ('CIQ049762', src.CIQ049762), ('CIQ048454', src.CIQ048454), ('CIQ048455', src.CIQ048455), ('CIQ048456', src.CIQ048456),
+                ('CIQ048457', src.CIQ048457), ('CIQ048458', src.CIQ048458), ('CIQ048459', src.CIQ048459), ('CIQ048460', src.CIQ048460),
+                ('CIQ048461', src.CIQ048461), ('CIQ048462', src.CIQ048462), ('CIQ048463', src.CIQ048463), ('CIQ048464', src.CIQ048464),
+                ('CIQ048466', src.CIQ048466), ('CIQ048467', src.CIQ048467), ('CIQ048468', src.CIQ048468), ('CIQ048469', src.CIQ048469),
+                ('CIQ048471', src.CIQ048471), ('CIQ048472', src.CIQ048472), ('CIQ048473', src.CIQ048473), ('CIQ048474', src.CIQ048474),
+                ('CIQ048475', src.CIQ048475), ('CIQ048476', src.CIQ048476), ('CIQ048477', src.CIQ048477), ('CIQ048478', src.CIQ048478),
+                ('CIQ048479', src.CIQ048479), ('CIQ048480', src.CIQ048480), ('CIQ048481', src.CIQ048481), ('CIQ048482', src.CIQ048482),
+                ('CIQ048486', src.CIQ048486), ('CIQ048500', src.CIQ048500), ('CIQ048501', src.CIQ048501), ('CIQ048502', src.CIQ048502),
+                ('CIQ048503', src.CIQ048503), ('CIQ048504', src.CIQ048504), ('CIQ048505', src.CIQ048505), ('CIQ048506', src.CIQ048506),
+                ('CIQ048507', src.CIQ048507), ('CIQ048508', src.CIQ048508), ('CIQ048509', src.CIQ048509), ('CIQ048510', src.CIQ048510),
+                ('CIQ048511', src.CIQ048511), ('CIQ048512', src.CIQ048512), ('CIQ048513', src.CIQ048513), ('CIQ048514', src.CIQ048514),
+                ('CIQ048516', src.CIQ048516), ('CIQ048517', src.CIQ048517), ('CIQ048518', src.CIQ048518), ('CIQ048519', src.CIQ048519),
+                ('CIQ048521', src.CIQ048521), ('CIQ048522', src.CIQ048522), ('CIQ048523', src.CIQ048523), ('CIQ048524', src.CIQ048524),
+                ('CIQ048525', src.CIQ048525), ('CIQ048526', src.CIQ048526), ('CIQ048527', src.CIQ048527), ('CIQ048528', src.CIQ048528),
+                ('CIQ048529', src.CIQ048529), ('CIQ048530', src.CIQ048530), ('CIQ048534', src.CIQ048534), ('CIQ048548', src.CIQ048548),
+                ('CIQ048549', src.CIQ048549), ('CIQ048550', src.CIQ048550), ('CIQ048551', src.CIQ048551), ('CIQ048552', src.CIQ048552),
+                ('CIQ048553', src.CIQ048553), ('CIQ048554', src.CIQ048554), ('CIQ048555', src.CIQ048555), ('CIQ048556', src.CIQ048556),
+                ('CIQ048557', src.CIQ048557), ('CIQ048558', src.CIQ048558), ('CIQ048559', src.CIQ048559), ('CIQ048560', src.CIQ048560),
+                ('CIQ048561', src.CIQ048561), ('CIQ048562', src.CIQ048562), ('CIQ048563', src.CIQ048563), ('CIQ048564', src.CIQ048564),
+                ('CIQ048566', src.CIQ048566), ('CIQ048567', src.CIQ048567), ('CIQ048568', src.CIQ048568), ('CIQ048569', src.CIQ048569),
+                ('CIQ048571', src.CIQ048571), ('CIQ048572', src.CIQ048572), ('CIQ048573', src.CIQ048573), ('CIQ048574', src.CIQ048574),
+                ('CIQ048575', src.CIQ048575), ('CIQ048576', src.CIQ048576), ('CIQ048577', src.CIQ048577), ('CIQ048578', src.CIQ048578),
+                ('CIQ048579', src.CIQ048579), ('CIQ048581', src.CIQ048581), ('CIQ048582', src.CIQ048582), ('CIQ048583', src.CIQ048583),
+                ('CIQ048584', src.CIQ048584), ('CIQ048585', src.CIQ048585), ('CIQ048586', src.CIQ048586), ('CIQ048587', src.CIQ048587),
+                ('CIQ048588', src.CIQ048588), ('CIQ048589', src.CIQ048589), ('CIQ048590', src.CIQ048590), ('CIQ048591', src.CIQ048591),
+                ('CIQ048596', src.CIQ048596), ('CIQ048597', src.CIQ048597), ('CIQ048598', src.CIQ048598), ('CIQ048599', src.CIQ048599),
+                ('CIQ048600', src.CIQ048600), ('CIQ048602', src.CIQ048602), ('CIQ048607', src.CIQ048607), ('CIQ048608', src.CIQ048608),
+                ('CIQ048610', src.CIQ048610), ('CIQ048611', src.CIQ048611), ('CIQ048613', src.CIQ048613), ('CIQ048652', src.CIQ048652),
+                ('CIQ048653', src.CIQ048653), ('CIQ048654', src.CIQ048654), ('CIQ048655', src.CIQ048655), ('CIQ048656', src.CIQ048656),
+                ('CIQ048657', src.CIQ048657), ('CIQ048658', src.CIQ048658), ('CIQ048659', src.CIQ048659), ('CIQ048660', src.CIQ048660),
+                ('CIQ048661', src.CIQ048661), ('CIQ048663', src.CIQ048663), ('CIQ048664', src.CIQ048664), ('CIQ048666', src.CIQ048666),
+                ('CIQ048667', src.CIQ048667), ('CIQ048668', src.CIQ048668), ('CIQ048669', src.CIQ048669), ('CIQ048671', src.CIQ048671),
+                ('CIQ048672', src.CIQ048672), ('CIQ048673', src.CIQ048673), ('CIQ048675', src.CIQ048675), ('CIQ048676', src.CIQ048676),
+                ('CIQ048677', src.CIQ048677), ('CIQ048679', src.CIQ048679), ('CIQ048680', src.CIQ048680), ('CIQ048681', src.CIQ048681),
+                ('CIQ048682', src.CIQ048682), ('CIQ048683', src.CIQ048683), ('CIQ048684', src.CIQ048684), ('CIQ048685', src.CIQ048685),
+                ('CIQ048686', src.CIQ048686), ('CIQ048687', src.CIQ048687), ('CIQ048688', src.CIQ048688), ('CIQ048689', src.CIQ048689),
+                ('CIQ048690', src.CIQ048690), ('CIQ048691', src.CIQ048691), ('CIQ048692', src.CIQ048692), ('CIQ048693', src.CIQ048693),
+                ('CIQ048694', src.CIQ048694), ('CIQ048695', src.CIQ048695), ('CIQ048696', src.CIQ048696), ('CIQ048697', src.CIQ048697),
+                ('CIQ048698', src.CIQ048698), ('CIQ048699', src.CIQ048699), ('CIQ048701', src.CIQ048701), ('CIQ048702', src.CIQ048702),
+                ('CIQ048703', src.CIQ048703), ('CIQ048704', src.CIQ048704), ('CIQ048705', src.CIQ048705), ('CIQ048706', src.CIQ048706),
+                ('CIQ048707', src.CIQ048707), ('CIQ048708', src.CIQ048708), ('CIQ049763', src.CIQ049763), ('CIQ049764', src.CIQ049764),
+                ('CIQ049765', src.CIQ049765), ('CIQ049766', src.CIQ049766), ('CIQ049767', src.CIQ049767), ('CIQ049768', src.CIQ049768),
+                ('CIQ049769', src.CIQ049769), ('CIQ049770', src.CIQ049770), ('CIQ049771', src.CIQ049771), ('CIQ049772', src.CIQ049772),
+                ('CIQ049773', src.CIQ049773), ('CIQ049774', src.CIQ049774), ('CIQ049775', src.CIQ049775), ('CIQ049776', src.CIQ049776),
+                ('CIQ049777', src.CIQ049777), ('CIQ049778', src.CIQ049778), ('CIQ049779', src.CIQ049779), ('CIQ049780', src.CIQ049780),
+                ('CIQ049781', src.CIQ049781), ('CIQ049782', src.CIQ049782), ('CIQ049783', src.CIQ049783), ('CIQ049784', src.CIQ049784),
+                ('CIQ049785', src.CIQ049785), ('CIQ049787', src.CIQ049787), ('CIQ049789', src.CIQ049789), ('CIQ049790', src.CIQ049790),
+                ('CIQ050045', src.CIQ050045), ('CIQ049791', src.CIQ049791), ('CIQ049792', src.CIQ049792), ('CIQ049793', src.CIQ049793),
+                ('CIQ049794', src.CIQ049794), ('CIQ049795', src.CIQ049795), ('CIQ049796', src.CIQ049796), ('CIQ049797', src.CIQ049797),
+                ('CIQ049798', src.CIQ049798), ('CIQ049799', src.CIQ049799), ('CIQ049800', src.CIQ049800), ('CIQ049801', src.CIQ049801),
+                ('CIQ049802', src.CIQ049802), ('CIQ049803', src.CIQ049803), ('CIQ049804', src.CIQ049804), ('CIQ049805', src.CIQ049805),
+                ('CIQ049806', src.CIQ049806), ('CIQ049807', src.CIQ049807), ('CIQ049808', src.CIQ049808), ('CIQ049809', src.CIQ049809),
+                ('CIQ049810', src.CIQ049810), ('CIQ049812', src.CIQ049812), ('CIQ049814', src.CIQ049814), ('CIQ050046', src.CIQ050046),
+                ('CIQ049815', src.CIQ049815), ('CIQ049816', src.CIQ049816), ('CIQ049817', src.CIQ049817), ('CIQ049819', src.CIQ049819),
+                ('CIQ050047', src.CIQ050047), ('CIQ049820', src.CIQ049820), ('CIQ049821', src.CIQ049821), ('CIQ049822', src.CIQ049822),
+                ('CIQ049823', src.CIQ049823), ('CIQ049844', src.CIQ049844), ('CIQ049845', src.CIQ049845), ('CIQ049846', src.CIQ049846),
+                ('CIQ049847', src.CIQ049847), ('CIQ050048', src.CIQ050048), ('CIQ049825', src.CIQ049825), ('CIQ049826', src.CIQ049826),
+                ('CIQ049827', src.CIQ049827), ('CIQ049828', src.CIQ049828), ('CIQ049824', src.CIQ049824), ('CIQ049829', src.CIQ049829),
+                ('CIQ049830', src.CIQ049830), ('CIQ049831', src.CIQ049831), ('CIQ049832', src.CIQ049832), ('CIQ049833', src.CIQ049833),
+                ('CIQ049839', src.CIQ049839), ('CIQ049834', src.CIQ049834), ('CIQ049835', src.CIQ049835), ('CIQ049836', src.CIQ049836),
+                ('CIQ049837', src.CIQ049837), ('CIQ049838', src.CIQ049838), ('CIQ049841', src.CIQ049841), ('CIQ049842', src.CIQ049842),
+                ('CIQ049843', src.CIQ049843), ('ReportedLeaseLiabilitiesDebt', src.ReportedLeaseLiabilitiesDebt),
+                ('LeaseLiabAdjToDebt', src.LeaseLiabAdjToDebt), ('MultiEmployerPensionPlanDebt', src.MultiEmployerPensionPlanDebt),
+                ('IncrementalLeaseEarning', src.IncrementalLeaseEarning), ('IncomeUnconsolidatedCompany', src.IncomeUnconsolidatedCompany),
+                ('IncrementalLeaseOpIncome', src.IncrementalLeaseOpIncome), ('IncrementalLeaseInterestExp', src.IncrementalLeaseInterestExp),
+                ('CashTaxesPaidEarning', src.CashTaxesPaidEarning), ('CashTaxesPaidOtherEarning', src.CashTaxesPaidOtherEarning),
+                ('CashInterestPaid', src.CashInterestPaid), ('CashInterestPaidOther', src.CashInterestPaidOther),
+                ('IncremLeaseFundOperation', src.IncremLeaseFundOperation), ('IncrementalLeaseCashFlowOper', src.IncrementalLeaseCashFlowOper)
+        ) AS m (MetricName, MetricValue)
+		LEFT JOIN @MetricDictionary md
+            ON md.MetricName = m.MetricName
+        LEFT JOIN ObjectViews..LiveMetaItem lmi ON lmi.ItemName = m.MetricName
+        ORDER BY src.FormOrder ASC, MetricName ASC;
+    END
+    ELSE IF UPPER(@SourceType) = N'CORP' AND @IsAdjusted = 1
+    BEGIN
+        ;WITH src AS
+        (
+            SELECT DISTINCT
+                feop.CIQ048400 AS CIQ048400,
+                feop.CIQ048401 AS CIQ048401,
+                feop.CIQ048402 AS CIQ048402,
+                feop.CIQ048403 AS CIQ048403,
+                feop.CIQ048404 AS CIQ048404,
+                feop.CIQ048405 AS CIQ048405,
+                feop.CIQ048406 AS CIQ048406,
+                feop.CIQ048407 AS CIQ048407,
+                feop.CIQ048408 AS CIQ048408,
+                feop.CIQ048409 AS CIQ048409,
+                feop.CIQ048410 AS CIQ048410,
+                feop.CIQ048412 AS CIQ048412,
+                feop.CIQ048413 AS CIQ048413,
+                feop.CIQ048414 AS CIQ048414,
+                feop.CIQ048416 AS CIQ048416,
+                feop.CIQ048417 AS CIQ048417,
+                feop.CIQ048418 AS CIQ048418,
+                feop.CIQ048419 AS CIQ048419,
+                feop.CIQ048421 AS CIQ048421,
+                feop.CIQ048422 AS CIQ048422,
+                feop.CIQ048423 AS CIQ048423,
+                feop.CIQ048424 AS CIQ048424,
+                feop.CIQ048425 AS CIQ048425,
+                ISNULL(feop.CIQ048426, 0) AS CIQ048426,
+                ISNULL(feop.CIQ048427, 0) AS CIQ048427,
+                ISNULL(feop.CIQ048428, 0) AS CIQ048428,
+                ISNULL(feop.CIQ048429, 0) AS CIQ048429,
+                ISNULL(feop.CIQ048431, 0) AS CIQ048431,
+                ISNULL(feop.CIQ048433, 0) AS CIQ048433,
+                ISNULL(feop.CIQ048434, 0) AS CIQ048434,
+                ISNULL(feop.CIQ048435, 0) AS CIQ048435,
+                ISNULL(feop.CIQ048436, 0) AS CIQ048436,
+                ISNULL(feop.CIQ048437, 0) AS CIQ048437,
+                ISNULL(feop.CIQ048438, 0) AS CIQ048438,
+                ISNULL(feop.CIQ048439, 0) AS CIQ048439,
+                ISNULL(feop.CIQ048440, 0) AS CIQ048440,
+                ISNULL(feop.CIQ048441, 0) AS CIQ048441,
+                ISNULL(feop.CIQ048442, 0) AS CIQ048442,
+                ISNULL(feop.CIQ048443, 0) AS CIQ048443,
+                ISNULL(feop.CIQ048445, 0) AS CIQ048445,
+                ISNULL(feop.CIQ048446, 0) AS CIQ048446,
+                ISNULL(feop.CIQ048447, 0) AS CIQ048447,
+                ISNULL(feop.CIQ048448, 0) AS CIQ048448,
+                ISNULL(feop.CIQ048449, 0) AS CIQ048449,
+                ISNULL(feop.CIQ048451, 0) AS CIQ048451,
+                ISNULL(feop.CIQ048452, 0) AS CIQ048452,
+                ISNULL(feop.CIQ048453, 0) AS CIQ048453,
+                ISNULL(feop.CIQ049753, 0) AS CIQ049753,
+                ISNULL(feop.CIQ049754, 0) AS CIQ049754,
+                ISNULL(feop.CIQ049755, 0) AS CIQ049755,
+                ISNULL(feop.CIQ049756, 0) AS CIQ049756,
+                ISNULL(feop.CIQ049757, 0) AS CIQ049757,
+                ISNULL(feop.CIQ049758, 0) AS CIQ049758,
+                ISNULL(feop.CIQ049759, 0) AS CIQ049759,
+                ISNULL(feop.CIQ049760, 0) AS CIQ049760,
+                ISNULL(feop.CIQ049761, 0) AS CIQ049761,
+                ISNULL(feop.CIQ049762, 0) AS CIQ049762,
+                ISNULL(fif1.CIQ048454, 0) AS CIQ048454,
+                ISNULL(fif1.CIQ048455, 0) AS CIQ048455,
+                ISNULL(fif1.CIQ048456, 0) AS CIQ048456,
+                ISNULL(fif1.CIQ048457, 0) AS CIQ048457,
+                ISNULL(fif1.CIQ048458, 0) AS CIQ048458,
+                ISNULL(fif1.CIQ048459, 0) AS CIQ048459,
+                ISNULL(fif1.CIQ048460, 0) AS CIQ048460,
+                ISNULL(fif1.CIQ048461, 0) AS CIQ048461,
+                ISNULL(fif1.CIQ048462, 0) AS CIQ048462,
+                ISNULL(fif1.CIQ048463, 0) AS CIQ048463,
+                ISNULL(fif1.CIQ048464, 0) AS CIQ048464,
+                ISNULL(fif1.CIQ048466, 0) AS CIQ048466,
+                ISNULL(fif1.CIQ048467, 0) AS CIQ048467,
+                ISNULL(fif1.CIQ048468, 0) AS CIQ048468,
+                ISNULL(fif1.CIQ048469, 0) AS CIQ048469,
+                ISNULL(fif1.CIQ048471, 0) AS CIQ048471,
+                ISNULL(fif1.CIQ048472, 0) AS CIQ048472,
+                ISNULL(fif1.CIQ048473, 0) AS CIQ048473,
+                ISNULL(fif1.CIQ048474, 0) AS CIQ048474,
+                ISNULL(fif1.CIQ048475, 0) AS CIQ048475,
+                ISNULL(fif1.CIQ048476, 0) AS CIQ048476,
+                ISNULL(fif1.CIQ048477, 0) AS CIQ048477,
+                ISNULL(fif1.CIQ048478, 0) AS CIQ048478,
+                ISNULL(fif1.CIQ048479, 0) AS CIQ048479,
+                ISNULL(fif1.CIQ048480, 0) AS CIQ048480,
+                ISNULL(fif1.CIQ048481, 0) AS CIQ048481,
+                ISNULL(fif1.CIQ048482, 0) AS CIQ048482,
+                ISNULL(fif1.CIQ048486, 0) AS CIQ048486,
+                ISNULL(fif1.CIQ048500, 0) AS CIQ048500,
+                ISNULL(fif1.CIQ048501, 0) AS CIQ048501,
+                ISNULL(fif1.CIQ048502, 0) AS CIQ048502,
+                ISNULL(fif1.CIQ048503, 0) AS CIQ048503,
+                ISNULL(fif1.CIQ048504, 0) AS CIQ048504,
+                ISNULL(fif1.CIQ048505, 0) AS CIQ048505,
+                ISNULL(fif1.CIQ048506, 0) AS CIQ048506,
+                ISNULL(fif1.CIQ048507, 0) AS CIQ048507,
+                ISNULL(fif1.CIQ048508, 0) AS CIQ048508,
+                ISNULL(fif1.CIQ048509, 0) AS CIQ048509,
+                ISNULL(fif1.CIQ048510, 0) AS CIQ048510,
+                ISNULL(fif1.CIQ048511, 0) AS CIQ048511,
+                ISNULL(fif1.CIQ048512, 0) AS CIQ048512,
+                ISNULL(fif1.CIQ048513, 0) AS CIQ048513,
+                ISNULL(fif1.CIQ048514, 0) AS CIQ048514,
+                ISNULL(fif1.CIQ048516, 0) AS CIQ048516,
+                ISNULL(fif1.CIQ048517, 0) AS CIQ048517,
+                ISNULL(fif1.CIQ048518, 0) AS CIQ048518,
+                ISNULL(fif1.CIQ048519, 0) AS CIQ048519,
+                ISNULL(fif1.CIQ048521, 0) AS CIQ048521,
+                ISNULL(fif1.CIQ048522, 0) AS CIQ048522,
+                ISNULL(fif1.CIQ048523, 0) AS CIQ048523,
+                ISNULL(fif1.CIQ048524, 0) AS CIQ048524,
+                ISNULL(fif1.CIQ048525, 0) AS CIQ048525,
+                ISNULL(fif1.CIQ048526, 0) AS CIQ048526,
+                ISNULL(fif1.CIQ048527, 0) AS CIQ048527,
+                ISNULL(fif1.CIQ048528, 0) AS CIQ048528,
+                ISNULL(fif1.CIQ048529, 0) AS CIQ048529,
+                ISNULL(fif1.CIQ048530, 0) AS CIQ048530,
+                ISNULL(fif1.CIQ048534, 0) AS CIQ048534,
+                ISNULL(fif1.CIQ048548, 0) AS CIQ048548,
+                ISNULL(fif1.CIQ048549, 0) AS CIQ048549,
+                ISNULL(fif1.CIQ048550, 0) AS CIQ048550,
+                ISNULL(fif1.CIQ048551, 0) AS CIQ048551,
+                ISNULL(fif1.CIQ048552, 0) AS CIQ048552,
+                ISNULL(fif1.CIQ048553, 0) AS CIQ048553,
+                ISNULL(fif1.CIQ048554, 0) AS CIQ048554,
+                ISNULL(fif1.CIQ048555, 0) AS CIQ048555,
+                ISNULL(fif1.CIQ048556, 0) AS CIQ048556,
+                ISNULL(fif1.CIQ048557, 0) AS CIQ048557,
+                ISNULL(fif1.CIQ048558, 0) AS CIQ048558,
+                ISNULL(fif1.CIQ048559, 0) AS CIQ048559,
+                ISNULL(fif1.CIQ048560, 0) AS CIQ048560,
+                ISNULL(fif1.CIQ048561, 0) AS CIQ048561,
+                ISNULL(fif1.CIQ048562, 0) AS CIQ048562,
+                ISNULL(fif1.CIQ048563, 0) AS CIQ048563,
+                ISNULL(fif1.CIQ048564, 0) AS CIQ048564,
+                ISNULL(fif1.CIQ048566, 0) AS CIQ048566,
+                ISNULL(fif1.CIQ048567, 0) AS CIQ048567,
+                ISNULL(fif1.CIQ048568, 0) AS CIQ048568,
+                ISNULL(fif1.CIQ048569, 0) AS CIQ048569,
+                ISNULL(fif1.CIQ048571, 0) AS CIQ048571,
+                ISNULL(fif1.CIQ048572, 0) AS CIQ048572,
+                ISNULL(fif1.CIQ048573, 0) AS CIQ048573,
+                ISNULL(fif1.CIQ048574, 0) AS CIQ048574,
+                ISNULL(fif1.CIQ048575, 0) AS CIQ048575,
+                ISNULL(fif1.CIQ048576, 0) AS CIQ048576,
+                ISNULL(fif1.CIQ048577, 0) AS CIQ048577,
+                ISNULL(fif1.CIQ048578, 0) AS CIQ048578,
+                ISNULL(fif1.CIQ048579, 0) AS CIQ048579,
+                ISNULL(fif1.CIQ048581, 0) AS CIQ048581,
+                ISNULL(fif1.CIQ048582, 0) AS CIQ048582,
+                ISNULL(fif1.CIQ048583, 0) AS CIQ048583,
+                ISNULL(fif1.CIQ048584, 0) AS CIQ048584,
+                ISNULL(fif1.CIQ048585, 0) AS CIQ048585,
+                ISNULL(fif1.CIQ048586, 0) AS CIQ048586,
+                ISNULL(fif1.CIQ048587, 0) AS CIQ048587,
+                ISNULL(fif1.CIQ048588, 0) AS CIQ048588,
+                ISNULL(fif1.CIQ048589, 0) AS CIQ048589,
+                ISNULL(fif1.CIQ048590, 0) AS CIQ048590,
+                ISNULL(fif1.CIQ048591, 0) AS CIQ048591,
+                ISNULL(fif1.CIQ048596, 0) AS CIQ048596,
+                ISNULL(fif1.CIQ048597, 0) AS CIQ048597,
+                ISNULL(fif1.CIQ048598, 0) AS CIQ048598,
+                ISNULL(fif1.CIQ048599, 0) AS CIQ048599,
+                ISNULL(fif1.CIQ048600, 0) AS CIQ048600,
+                ISNULL(fif1.CIQ048602, 0) AS CIQ048602,
+                ISNULL(fif1.CIQ048607, 0) AS CIQ048607,
+                ISNULL(fif1.CIQ048608, 0) AS CIQ048608,
+                ISNULL(fif1.CIQ048610, 0) AS CIQ048610,
+                ISNULL(fif1.CIQ048611, 0) AS CIQ048611,
+                ISNULL(fif1.CIQ048613, 0) AS CIQ048613,
+                ISNULL(fif1.CIQ048652, 0) AS CIQ048652,
+                ISNULL(fif1.CIQ048653, 0) AS CIQ048653,
+                ISNULL(fif1.CIQ048654, 0) AS CIQ048654,
+                ISNULL(fif1.CIQ048655, 0) AS CIQ048655,
+                ISNULL(fif1.CIQ048656, 0) AS CIQ048656,
+                ISNULL(fif1.CIQ048657, 0) AS CIQ048657,
+                ISNULL(fif1.CIQ048658, 0) AS CIQ048658,
+                ISNULL(fif1.CIQ048659, 0) AS CIQ048659,
+                ISNULL(fif1.CIQ048660, 0) AS CIQ048660,
+                ISNULL(fif1.CIQ048661, 0) AS CIQ048661,
+                ISNULL(fif1.CIQ048663, 0) AS CIQ048663,
+                ISNULL(fif1.CIQ048664, 0) AS CIQ048664,
+                ISNULL(fif1.CIQ048666, 0) AS CIQ048666,
+                ISNULL(fif1.CIQ048667, 0) AS CIQ048667,
+                ISNULL(fif1.CIQ048668, 0) AS CIQ048668,
+                ISNULL(fif1.CIQ048669, 0) AS CIQ048669,
+                ISNULL(fif1.CIQ048671, 0) AS CIQ048671,
+                ISNULL(fif1.CIQ048672, 0) AS CIQ048672,
+                ISNULL(fif1.CIQ048673, 0) AS CIQ048673,
+                ISNULL(fif1.CIQ048675, 0) AS CIQ048675,
+                ISNULL(fif1.CIQ048676, 0) AS CIQ048676,
+                ISNULL(fif1.CIQ048677, 0) AS CIQ048677,
+                ISNULL(fif1.CIQ048679, 0) AS CIQ048679,
+                ISNULL(fif1.CIQ048680, 0) AS CIQ048680,
+                ISNULL(fif1.CIQ048681, 0) AS CIQ048681,
+                ISNULL(fif1.CIQ048682, 0) AS CIQ048682,
+                ISNULL(fif1.CIQ048683, 0) AS CIQ048683,
+                ISNULL(fif1.CIQ048684, 0) AS CIQ048684,
+                ISNULL(fif1.CIQ048685, 0) AS CIQ048685,
+                ISNULL(fif1.CIQ048686, 0) AS CIQ048686,
+                ISNULL(fif1.CIQ048687, 0) AS CIQ048687,
+                ISNULL(fif1.CIQ048688, 0) AS CIQ048688,
+                ISNULL(fif1.CIQ048689, 0) AS CIQ048689,
+                ISNULL(fif1.CIQ048690, 0) AS CIQ048690,
+                ISNULL(fif1.CIQ048691, 0) AS CIQ048691,
+                ISNULL(fif1.CIQ048692, 0) AS CIQ048692,
+                ISNULL(fif1.CIQ048693, 0) AS CIQ048693,
+                ISNULL(fif1.CIQ048694, 0) AS CIQ048694,
+                ISNULL(fif1.CIQ048695, 0) AS CIQ048695,
+                ISNULL(fif1.CIQ048696, 0) AS CIQ048696,
+                ISNULL(fif1.CIQ048697, 0) AS CIQ048697,
+                ISNULL(fif1.CIQ048698, 0) AS CIQ048698,
+                ISNULL(fif1.CIQ048699, 0) AS CIQ048699,
+                ISNULL(fif1.CIQ048701, 0) AS CIQ048701,
+                ISNULL(fif1.CIQ048702, 0) AS CIQ048702,
+                ISNULL(fif1.CIQ048703, 0) AS CIQ048703,
+                ISNULL(fif1.CIQ048704, 0) AS CIQ048704,
+                ISNULL(fif1.CIQ048705, 0) AS CIQ048705,
+                ISNULL(fif1.CIQ048706, 0) AS CIQ048706,
+                ISNULL(fif1.CIQ048707, 0) AS CIQ048707,
+                ISNULL(fif1.CIQ048708, 0) AS CIQ048708,
+                ISNULL(fif2.CIQ049763, 0) AS CIQ049763,
+                ISNULL(fif2.CIQ049764, 0) AS CIQ049764,
+                ISNULL(fif2.CIQ049765, 0) AS CIQ049765,
+                ISNULL(fif2.CIQ049766, 0) AS CIQ049766,
+                ISNULL(fif2.CIQ049767, 0) AS CIQ049767,
+                ISNULL(fif2.CIQ049768, 0) AS CIQ049768,
+                ISNULL(fif2.CIQ049769, 0) AS CIQ049769,
+                ISNULL(fif2.CIQ049770, 0) AS CIQ049770,
+                ISNULL(fif2.CIQ049771, 0) AS CIQ049771,
+                ISNULL(fif2.CIQ049772, 0) AS CIQ049772,
+                ISNULL(fif2.CIQ049773, 0) AS CIQ049773,
+                ISNULL(fif2.CIQ049774, 0) AS CIQ049774,
+                ISNULL(fif2.CIQ049775, 0) AS CIQ049775,
+                ISNULL(fif2.CIQ049776, 0) AS CIQ049776,
+                ISNULL(fif2.CIQ049777, 0) AS CIQ049777,
+                ISNULL(fif2.CIQ049778, 0) AS CIQ049778,
+                ISNULL(fif2.CIQ049779, 0) AS CIQ049779,
+                ISNULL(fif2.CIQ049780, 0) AS CIQ049780,
+                ISNULL(fif2.CIQ049781, 0) AS CIQ049781,
+                ISNULL(fif2.CIQ049782, 0) AS CIQ049782,
+                ISNULL(fif2.CIQ049783, 0) AS CIQ049783,
+                ISNULL(fif2.CIQ049784, 0) AS CIQ049784,
+                ISNULL(fif2.CIQ049785, 0) AS CIQ049785,
+                ISNULL(fif2.CIQ049787, 0) AS CIQ049787,
+                ISNULL(fif2.CIQ049789, 0) AS CIQ049789,
+                ISNULL(fif2.CIQ049790, 0) AS CIQ049790,
+                ISNULL(fif2.CIQ050045, 0) AS CIQ050045,
+                ISNULL(fif2.CIQ049791, 0) AS CIQ049791,
+                ISNULL(fif2.CIQ049792, 0) AS CIQ049792,
+                ISNULL(fif2.CIQ049793, 0) AS CIQ049793,
+                ISNULL(fif2.CIQ049794, 0) AS CIQ049794,
+                ISNULL(fif2.CIQ049795, 0) AS CIQ049795,
+                ISNULL(fif2.CIQ049796, 0) AS CIQ049796,
+                ISNULL(fif2.CIQ049797, 0) AS CIQ049797,
+                ISNULL(fif2.CIQ049798, 0) AS CIQ049798,
+                ISNULL(fif2.CIQ049799, 0) AS CIQ049799,
+                ISNULL(fif2.CIQ049800, 0) AS CIQ049800,
+                ISNULL(fif2.CIQ049801, 0) AS CIQ049801,
+                ISNULL(fif2.CIQ049802, 0) AS CIQ049802,
+                ISNULL(fif2.CIQ049803, 0) AS CIQ049803,
+                ISNULL(fif2.CIQ049804, 0) AS CIQ049804,
+                ISNULL(fif2.CIQ049805, 0) AS CIQ049805,
+                ISNULL(fif2.CIQ049806, 0) AS CIQ049806,
+                ISNULL(fif2.CIQ049807, 0) AS CIQ049807,
+                ISNULL(fif2.CIQ049808, 0) AS CIQ049808,
+                ISNULL(fif2.CIQ049809, 0) AS CIQ049809,
+                ISNULL(fif2.CIQ049810, 0) AS CIQ049810,
+                ISNULL(fif2.CIQ049812, 0) AS CIQ049812,
+                ISNULL(fif2.CIQ049814, 0) AS CIQ049814,
+                ISNULL(fif2.CIQ050046, 0) AS CIQ050046,
+                ISNULL(fif2.CIQ049815, 0) AS CIQ049815,
+                ISNULL(fif2.CIQ049816, 0) AS CIQ049816,
+                ISNULL(fif2.CIQ049817, 0) AS CIQ049817,
+                ISNULL(fif2.CIQ049819, 0) AS CIQ049819,
+                ISNULL(fif2.CIQ050047, 0) AS CIQ050047,
+                ISNULL(fif2.CIQ049820, 0) AS CIQ049820,
+                ISNULL(fif2.CIQ049821, 0) AS CIQ049821,
+                ISNULL(fif2.CIQ049822, 0) AS CIQ049822,
+                ISNULL(fif2.CIQ049823, 0) AS CIQ049823,
+                ISNULL(fif2.CIQ049844, 0) AS CIQ049844,
+                ISNULL(fif2.CIQ049845, 0) AS CIQ049845,
+                ISNULL(fif2.CIQ049846, 0) AS CIQ049846,
+                ISNULL(fif2.CIQ049847, 0) AS CIQ049847,
+                ISNULL(fif2.CIQ050048, 0) AS CIQ050048,
+                ISNULL(fif2.CIQ049825, 0) AS CIQ049825,
+                ISNULL(fif2.CIQ049826, 0) AS CIQ049826,
+                ISNULL(fif2.CIQ049827, 0) AS CIQ049827,
+                ISNULL(fif2.CIQ049828, 0) AS CIQ049828,
+                ISNULL(fif2.CIQ049824, 0) AS CIQ049824,
+                ISNULL(fif2.CIQ049829, 0) AS CIQ049829,
+                ISNULL(fif2.CIQ049830, 0) AS CIQ049830,
+                ISNULL(fif2.CIQ049831, 0) AS CIQ049831,
+                ISNULL(fif2.CIQ049832, 0) AS CIQ049832,
+                ISNULL(fif2.CIQ049833, 0) AS CIQ049833,
+                ISNULL(fif2.CIQ049839, 0) AS CIQ049839,
+                ISNULL(fif2.CIQ049834, 0) AS CIQ049834,
+                ISNULL(fif2.CIQ049835, 0) AS CIQ049835,
+                ISNULL(fif2.CIQ049836, 0) AS CIQ049836,
+                ISNULL(fif2.CIQ049837, 0) AS CIQ049837,
+                ISNULL(fif2.CIQ049838, 0) AS CIQ049838,
+                ISNULL(fif2.CIQ049841, 0) AS CIQ049841,
+                ISNULL(fif2.CIQ049842, 0) AS CIQ049842,
+                ISNULL(fif2.CIQ049843, 0) AS CIQ049843,
+                ISNULL(feop.ReportedLeaseLiabilitiesDebt, 0) AS ReportedLeaseLiabilitiesDebt,
+                ISNULL(feop.LeaseLiabAdjToDebt, 0) AS LeaseLiabAdjToDebt,
+                ISNULL(feop.MultiEmployerPensionPlanDebt, 0) AS MultiEmployerPensionPlanDebt,
+                ISNULL(fif1.IncrementalLeaseEarning, 0) AS IncrementalLeaseEarning,
+                ISNULL(fif1.IncomeUnconsolidatedCompany, 0) AS IncomeUnconsolidatedCompany,
+                ISNULL(fif1.IncrementalLeaseOpIncome, 0) AS IncrementalLeaseOpIncome,
+                ISNULL(fif1.IncrementalLeaseInterestExp, 0) AS IncrementalLeaseInterestExp,
+                ISNULL(fif1.CashTaxesPaidEarning, 0) AS CashTaxesPaidEarning,
+                ISNULL(fif1.CashTaxesPaidOtherEarning, 0) AS CashTaxesPaidOtherEarning,
+                ISNULL(fif1.CashInterestPaid, 0) AS CashInterestPaid,
+                ISNULL(fif1.CashInterestPaidOther, 0) AS CashInterestPaidOther,
+                ISNULL(fif1.IncremLeaseFundOperation, 0) AS IncremLeaseFundOperation,
+                ISNULL(fif1.IncrementalLeaseCashFlowOper, 0) AS IncrementalLeaseCashFlowOper,
+                period.FiscalYear,
+                period.FiscalQuarter,
+                tdsf.FiscalPeriodGAAP,
+                tdsf.listpos AS FormOrder,
+                feop.DateEnded AS PeriodDateEnded,
+                feop.KeyCurrency AS CurrencyCode,
+                '(' + ISNULL(RTRIM(lc.CurrencySymbol), '$') +
+                CASE lc.MagnitudeMultiplierDisplay
+                    WHEN 3 THEN '000'
+                    WHEN 6 THEN 'M'
+                    WHEN 9 THEN 'B'
+                    WHEN 12 THEN 'T'
+                    ELSE 'M'
+                END + ')' AS MagnitudeMultiplier,
+                rrs.RatingReviewStatus
+            FROM objectviews..SPGRCorpFIFinlEOP feop
+            INNER JOIN objectviews..SPGRCorpFIFinl fif1
+                ON fif1.KeySPGRCorpFIFinlEOP = feop.KeySPGRCorpFIFinlEOP
+            INNER JOIN objectviews..SPGRCorpFIFinl2 fif2
+                ON fif2.KeySPGRCorpFIFinlEOP = feop.KeySPGRCorpFIFinlEOP
+            INNER JOIN objectviews..SPGRCorpFIFinlPeriod period
+                ON fif1.KeySPGRCorpFIFinl = period.KeySPGRCorpFIFinl
+               AND fif2.KeySPGRCorpFIFinl = period.KeySPGRCorpFIFinl
+            INNER JOIN objectviews..RatingEntity re
+                ON re.KeyRatingEntity = feop.KeyRatingEntity
+            INNER JOIN #tempdatasource_Final tdsf
+                ON period.FiscalYear = tdsf.DateField
+               AND period.FiscalQuarter = tdsf.FiscalQuarter
+            LEFT JOIN objectviews..LookupRatingReviewStatus rrs
+                ON rrs.KeyRatingReviewStatus = period.KeyRatingReviewStatus
+            LEFT JOIN objectviews..LookupCurrency lc
+                ON lc.KeyCurrency = feop.KeyCurrency
+            WHERE re.KeyInstn = @KeyInstn
+              AND re.KeyInstnRatingAgency = 3000325
+              AND re.KeySPGRCorpFISource = 0
+              AND re.IsPrimary = 1
+              AND re.OIDVENDOR IS NOT NULL
+              AND re.CSDData = 1
+        )
+        SELECT
+            CASE 
+                WHEN md.GroupName IS NOT NULL 
+                    THEN md.GroupName + '|' + m.MetricName
+                ELSE m.MetricName
+            END AS MetricName,
+            m.MetricValue,
+            src.FiscalYear,
+            src.FiscalPeriodGAAP,
+            src.PeriodDateEnded,
+            src.CurrencyCode,
+             CASE
+			-- Currency-scaled: first char of Magnitude is a known currency symbol
+			-- src.MagnitudeMultiplier already has correct symbol+scale e.g. (€M), (₹M), (£M)
+				WHEN EXISTS (
+					SELECT 1 FROM ObjectViews..LookupCurrency lc2
+					WHERE RTRIM(lc2.CurrencySymbol) = LEFT(RTRIM(lmi.Magnitude), 1)
+				)
+					THEN src.MagnitudeMultiplier                    -- ($M), (€M), (£M), (₹M)
+
+				-- Non-currency: %, x, bp — first char not a currency symbol
+				WHEN lmi.Magnitude IS NOT NULL
+					THEN '(' + RTRIM(lmi.Magnitude) + ')'           -- (%), (x), (bp)
+
+				-- No LiveMetaItem match: fallback
+				ELSE src.MagnitudeMultiplier                        -- ($M), (€M)
+			END AS MagnitudeMultiplier,
+            src.RatingReviewStatus
+        FROM src
+        CROSS APPLY
+        (
+            VALUES
+                ('CIQ048400', src.CIQ048400), ('CIQ048401', src.CIQ048401), ('CIQ048402', src.CIQ048402), ('CIQ048403', src.CIQ048403),
+                ('CIQ048404', src.CIQ048404), ('CIQ048405', src.CIQ048405), ('CIQ048406', src.CIQ048406), ('CIQ048407', src.CIQ048407),
+                ('CIQ048408', src.CIQ048408), ('CIQ048409', src.CIQ048409), ('CIQ048410', src.CIQ048410), ('CIQ048412', src.CIQ048412),
+                ('CIQ048413', src.CIQ048413), ('CIQ048414', src.CIQ048414), ('CIQ048416', src.CIQ048416), ('CIQ048417', src.CIQ048417),
+                ('CIQ048418', src.CIQ048418), ('CIQ048419', src.CIQ048419), ('CIQ048421', src.CIQ048421), ('CIQ048422', src.CIQ048422),
+                ('CIQ048423', src.CIQ048423), ('CIQ048424', src.CIQ048424), ('CIQ048425', src.CIQ048425), ('CIQ048426', src.CIQ048426),
+                ('CIQ048427', src.CIQ048427), ('CIQ048428', src.CIQ048428), ('CIQ048429', src.CIQ048429), ('CIQ048431', src.CIQ048431),
+                ('CIQ048433', src.CIQ048433), ('CIQ048434', src.CIQ048434), ('CIQ048435', src.CIQ048435), ('CIQ048436', src.CIQ048436),
+                ('CIQ048437', src.CIQ048437), ('CIQ048438', src.CIQ048438), ('CIQ048439', src.CIQ048439), ('CIQ048440', src.CIQ048440),
+                ('CIQ048441', src.CIQ048441), ('CIQ048442', src.CIQ048442), ('CIQ048443', src.CIQ048443), ('CIQ048445', src.CIQ048445),
+                ('CIQ048446', src.CIQ048446), ('CIQ048447', src.CIQ048447), ('CIQ048448', src.CIQ048448), ('CIQ048449', src.CIQ048449),
+                ('CIQ048451', src.CIQ048451), ('CIQ048452', src.CIQ048452), ('CIQ048453', src.CIQ048453), ('CIQ049753', src.CIQ049753),
+                ('CIQ049754', src.CIQ049754), ('CIQ049755', src.CIQ049755), ('CIQ049756', src.CIQ049756), ('CIQ049757', src.CIQ049757),
+                ('CIQ049758', src.CIQ049758), ('CIQ049759', src.CIQ049759), ('CIQ049760', src.CIQ049760), ('CIQ049761', src.CIQ049761),
+                ('CIQ049762', src.CIQ049762), ('CIQ048454', src.CIQ048454), ('CIQ048455', src.CIQ048455), ('CIQ048456', src.CIQ048456),
+                ('CIQ048457', src.CIQ048457), ('CIQ048458', src.CIQ048458), ('CIQ048459', src.CIQ048459), ('CIQ048460', src.CIQ048460),
+                ('CIQ048461', src.CIQ048461), ('CIQ048462', src.CIQ048462), ('CIQ048463', src.CIQ048463), ('CIQ048464', src.CIQ048464),
+                ('CIQ048466', src.CIQ048466), ('CIQ048467', src.CIQ048467), ('CIQ048468', src.CIQ048468), ('CIQ048469', src.CIQ048469),
+                ('CIQ048471', src.CIQ048471), ('CIQ048472', src.CIQ048472), ('CIQ048473', src.CIQ048473), ('CIQ048474', src.CIQ048474),
+                ('CIQ048475', src.CIQ048475), ('CIQ048476', src.CIQ048476), ('CIQ048477', src.CIQ048477), ('CIQ048478', src.CIQ048478),
+                ('CIQ048479', src.CIQ048479), ('CIQ048480', src.CIQ048480), ('CIQ048481', src.CIQ048481), ('CIQ048482', src.CIQ048482),
+                ('CIQ048486', src.CIQ048486), ('CIQ048500', src.CIQ048500), ('CIQ048501', src.CIQ048501), ('CIQ048502', src.CIQ048502),
+                ('CIQ048503', src.CIQ048503), ('CIQ048504', src.CIQ048504), ('CIQ048505', src.CIQ048505), ('CIQ048506', src.CIQ048506),
+                ('CIQ048507', src.CIQ048507), ('CIQ048508', src.CIQ048508), ('CIQ048509', src.CIQ048509), ('CIQ048510', src.CIQ048510),
+                ('CIQ048511', src.CIQ048511), ('CIQ048512', src.CIQ048512), ('CIQ048513', src.CIQ048513), ('CIQ048514', src.CIQ048514),
+                ('CIQ048516', src.CIQ048516), ('CIQ048517', src.CIQ048517), ('CIQ048518', src.CIQ048518), ('CIQ048519', src.CIQ048519),
+                ('CIQ048521', src.CIQ048521), ('CIQ048522', src.CIQ048522), ('CIQ048523', src.CIQ048523), ('CIQ048524', src.CIQ048524),
+                ('CIQ048525', src.CIQ048525), ('CIQ048526', src.CIQ048526), ('CIQ048527', src.CIQ048527), ('CIQ048528', src.CIQ048528),
+                ('CIQ048529', src.CIQ048529), ('CIQ048530', src.CIQ048530), ('CIQ048534', src.CIQ048534), ('CIQ048548', src.CIQ048548),
+                ('CIQ048549', src.CIQ048549), ('CIQ048550', src.CIQ048550), ('CIQ048551', src.CIQ048551), ('CIQ048552', src.CIQ048552),
+                ('CIQ048553', src.CIQ048553), ('CIQ048554', src.CIQ048554), ('CIQ048555', src.CIQ048555), ('CIQ048556', src.CIQ048556),
+                ('CIQ048557', src.CIQ048557), ('CIQ048558', src.CIQ048558), ('CIQ048559', src.CIQ048559), ('CIQ048560', src.CIQ048560),
+                ('CIQ048561', src.CIQ048561), ('CIQ048562', src.CIQ048562), ('CIQ048563', src.CIQ048563), ('CIQ048564', src.CIQ048564),
+                ('CIQ048566', src.CIQ048566), ('CIQ048567', src.CIQ048567), ('CIQ048568', src.CIQ048568), ('CIQ048569', src.CIQ048569),
+                ('CIQ048571', src.CIQ048571), ('CIQ048572', src.CIQ048572), ('CIQ048573', src.CIQ048573), ('CIQ048574', src.CIQ048574),
+                ('CIQ048575', src.CIQ048575), ('CIQ048576', src.CIQ048576), ('CIQ048577', src.CIQ048577), ('CIQ048578', src.CIQ048578),
+                ('CIQ048579', src.CIQ048579), ('CIQ048581', src.CIQ048581), ('CIQ048582', src.CIQ048582), ('CIQ048583', src.CIQ048583),
+                ('CIQ048584', src.CIQ048584), ('CIQ048585', src.CIQ048585), ('CIQ048586', src.CIQ048586), ('CIQ048587', src.CIQ048587),
+                ('CIQ048588', src.CIQ048588), ('CIQ048589', src.CIQ048589), ('CIQ048590', src.CIQ048590), ('CIQ048591', src.CIQ048591),
+                ('CIQ048596', src.CIQ048596), ('CIQ048597', src.CIQ048597), ('CIQ048598', src.CIQ048598), ('CIQ048599', src.CIQ048599),
+                ('CIQ048600', src.CIQ048600), ('CIQ048602', src.CIQ048602), ('CIQ048607', src.CIQ048607), ('CIQ048608', src.CIQ048608),
+                ('CIQ048610', src.CIQ048610), ('CIQ048611', src.CIQ048611), ('CIQ048613', src.CIQ048613), ('CIQ048652', src.CIQ048652),
+                ('CIQ048653', src.CIQ048653), ('CIQ048654', src.CIQ048654), ('CIQ048655', src.CIQ048655), ('CIQ048656', src.CIQ048656),
+                ('CIQ048657', src.CIQ048657), ('CIQ048658', src.CIQ048658), ('CIQ048659', src.CIQ048659), ('CIQ048660', src.CIQ048660),
+                ('CIQ048661', src.CIQ048661), ('CIQ048663', src.CIQ048663), ('CIQ048664', src.CIQ048664), ('CIQ048666', src.CIQ048666),
+                ('CIQ048667', src.CIQ048667), ('CIQ048668', src.CIQ048668), ('CIQ048669', src.CIQ048669), ('CIQ048671', src.CIQ048671),
+                ('CIQ048672', src.CIQ048672), ('CIQ048673', src.CIQ048673), ('CIQ048675', src.CIQ048675), ('CIQ048676', src.CIQ048676),
+                ('CIQ048677', src.CIQ048677), ('CIQ048679', src.CIQ048679), ('CIQ048680', src.CIQ048680), ('CIQ048681', src.CIQ048681),
+                ('CIQ048682', src.CIQ048682), ('CIQ048683', src.CIQ048683), ('CIQ048684', src.CIQ048684), ('CIQ048685', src.CIQ048685),
+                ('CIQ048686', src.CIQ048686), ('CIQ048687', src.CIQ048687), ('CIQ048688', src.CIQ048688), ('CIQ048689', src.CIQ048689),
+                ('CIQ048690', src.CIQ048690), ('CIQ048691', src.CIQ048691), ('CIQ048692', src.CIQ048692), ('CIQ048693', src.CIQ048693),
+                ('CIQ048694', src.CIQ048694), ('CIQ048695', src.CIQ048695), ('CIQ048696', src.CIQ048696), ('CIQ048697', src.CIQ048697),
+                ('CIQ048698', src.CIQ048698), ('CIQ048699', src.CIQ048699), ('CIQ048701', src.CIQ048701), ('CIQ048702', src.CIQ048702),
+                ('CIQ048703', src.CIQ048703), ('CIQ048704', src.CIQ048704), ('CIQ048705', src.CIQ048705), ('CIQ048706', src.CIQ048706),
+                ('CIQ048707', src.CIQ048707), ('CIQ048708', src.CIQ048708), ('CIQ049763', src.CIQ049763), ('CIQ049764', src.CIQ049764),
+                ('CIQ049765', src.CIQ049765), ('CIQ049766', src.CIQ049766), ('CIQ049767', src.CIQ049767), ('CIQ049768', src.CIQ049768),
+                ('CIQ049769', src.CIQ049769), ('CIQ049770', src.CIQ049770), ('CIQ049771', src.CIQ049771), ('CIQ049772', src.CIQ049772),
+                ('CIQ049773', src.CIQ049773), ('CIQ049774', src.CIQ049774), ('CIQ049775', src.CIQ049775), ('CIQ049776', src.CIQ049776),
+                ('CIQ049777', src.CIQ049777), ('CIQ049778', src.CIQ049778), ('CIQ049779', src.CIQ049779), ('CIQ049780', src.CIQ049780),
+                ('CIQ049781', src.CIQ049781), ('CIQ049782', src.CIQ049782), ('CIQ049783', src.CIQ049783), ('CIQ049784', src.CIQ049784),
+                ('CIQ049785', src.CIQ049785), ('CIQ049787', src.CIQ049787), ('CIQ049789', src.CIQ049789), ('CIQ049790', src.CIQ049790),
+                ('CIQ050045', src.CIQ050045), ('CIQ049791', src.CIQ049791), ('CIQ049792', src.CIQ049792), ('CIQ049793', src.CIQ049793),
+                ('CIQ049794', src.CIQ049794), ('CIQ049795', src.CIQ049795), ('CIQ049796', src.CIQ049796), ('CIQ049797', src.CIQ049797),
+                ('CIQ049798', src.CIQ049798), ('CIQ049799', src.CIQ049799), ('CIQ049800', src.CIQ049800), ('CIQ049801', src.CIQ049801),
+                ('CIQ049802', src.CIQ049802), ('CIQ049803', src.CIQ049803), ('CIQ049804', src.CIQ049804), ('CIQ049805', src.CIQ049805),
+                ('CIQ049806', src.CIQ049806), ('CIQ049807', src.CIQ049807), ('CIQ049808', src.CIQ049808), ('CIQ049809', src.CIQ049809),
+                ('CIQ049810', src.CIQ049810), ('CIQ049812', src.CIQ049812), ('CIQ049814', src.CIQ049814), ('CIQ050046', src.CIQ050046),
+                ('CIQ049815', src.CIQ049815), ('CIQ049816', src.CIQ049816), ('CIQ049817', src.CIQ049817), ('CIQ049819', src.CIQ049819),
+                ('CIQ050047', src.CIQ050047), ('CIQ049820', src.CIQ049820), ('CIQ049821', src.CIQ049821), ('CIQ049822', src.CIQ049822),
+                ('CIQ049823', src.CIQ049823), ('CIQ049844', src.CIQ049844), ('CIQ049845', src.CIQ049845), ('CIQ049846', src.CIQ049846),
+                ('CIQ049847', src.CIQ049847), ('CIQ050048', src.CIQ050048), ('CIQ049825', src.CIQ049825), ('CIQ049826', src.CIQ049826),
+                ('CIQ049827', src.CIQ049827), ('CIQ049828', src.CIQ049828), ('CIQ049824', src.CIQ049824), ('CIQ049829', src.CIQ049829),
+                ('CIQ049830', src.CIQ049830), ('CIQ049831', src.CIQ049831), ('CIQ049832', src.CIQ049832), ('CIQ049833', src.CIQ049833),
+                ('CIQ049839', src.CIQ049839), ('CIQ049834', src.CIQ049834), ('CIQ049835', src.CIQ049835), ('CIQ049836', src.CIQ049836),
+                ('CIQ049837', src.CIQ049837), ('CIQ049838', src.CIQ049838), ('CIQ049841', src.CIQ049841), ('CIQ049842', src.CIQ049842),
+                ('CIQ049843', src.CIQ049843), ('ReportedLeaseLiabilitiesDebt', src.ReportedLeaseLiabilitiesDebt),
+                ('LeaseLiabAdjToDebt', src.LeaseLiabAdjToDebt), ('MultiEmployerPensionPlanDebt', src.MultiEmployerPensionPlanDebt),
+                ('IncrementalLeaseEarning', src.IncrementalLeaseEarning), ('IncomeUnconsolidatedCompany', src.IncomeUnconsolidatedCompany),
+                ('IncrementalLeaseOpIncome', src.IncrementalLeaseOpIncome), ('IncrementalLeaseInterestExp', src.IncrementalLeaseInterestExp),
+                ('CashTaxesPaidEarning', src.CashTaxesPaidEarning), ('CashTaxesPaidOtherEarning', src.CashTaxesPaidOtherEarning),
+                ('CashInterestPaid', src.CashInterestPaid), ('CashInterestPaidOther', src.CashInterestPaidOther),
+                ('IncremLeaseFundOperation', src.IncremLeaseFundOperation), ('IncrementalLeaseCashFlowOper', src.IncrementalLeaseCashFlowOper)
+        ) AS m (MetricName, MetricValue)
+		LEFT JOIN @MetricDictionary md
+            ON md.MetricName = m.MetricName
+        LEFT JOIN ObjectViews..LiveMetaItem lmi ON lmi.ItemName = m.MetricName
+        ORDER BY src.FormOrder ASC, MetricName ASC;
+    END;
+
+    DROP TABLE #tempdatasource;
+    DROP TABLE #tempdatasource_Final;
+END;

@@ -1,0 +1,2708 @@
+USE [Product_hydra]
+GO
+/****** Object:  StoredProcedure [dbo].[S_HYDROB_RD_ENTITY_ReconciliationPage_V2_prc]    Script Date: 7/13/2026 1:11:52 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+--exec [S_HYDROB_RD_ENTITY_ReconciliationPage_V2_prc] 4000193, '2017FY'
+ALTER PROCEDURE [dbo].[S_HYDROB_RD_ENTITY_ReconciliationPage_V2_prc]       
+(      
+      
+ @KeyInstn INT = 0,      
+ @InquiryPeriodValue NVARCHAR(1000)      
+      
+)      
+AS       
+ SET NOCOUNT ON;       
+ BEGIN       
+       
+ Declare @Count INT             
+                  
+                      
+  SELECT                          
+    [str] AS DataSourcePeriod,            
+  SUBSTRING(([str]), 1, 4) AS FiscalYear,            
+    CASE            
+   WHEN SUBSTRING(([str]), 5, 6) = 'Q1' THEN '1'            
+   WHEN SUBSTRING(([str]), 5, 6) = 'Q2' THEN '2'            
+   WHEN SUBSTRING(([str]), 5, 6) = 'Q3' THEN '3'            
+   WHEN SUBSTRING(([str]), 5, 6) = 'Q4' THEN '4'              
+   WHEN SUBSTRING(([str]), 5, 6) = 'H1' THEN 'F'        
+   WHEN SUBSTRING(([str]), 5, 6) = 'H2' THEN 'H'            
+   WHEN SUBSTRING(([str]), 5, 6) = 'L' THEN 'L'        
+   ELSE 'Y'            
+   END AS FiscalQuarter,                       
+    listpos                          
+   INTO                          
+   #tempdatasource                          
+   FROM   dbo.Iter_charlist_to_table(@InquiryPeriodValue, ',')        
+   -- FROM   dbo.Iter_charlist_to_table('2016FY,2017FY,2018FY,2019FY,2020FY, 2016Q1, 2016Q2, 2016Q2,2016Q4,2019Q1, 2019Q2, 2019Q2,2019Q4', ',')       
+                    
+             
+ CREATE INDEX IX_#tempdatasource on #tempdatasource(listpos)            
+                       
+ SET @Count = (select COUNT(*) from #tempdatasource)                      
+                 
+   select *,              
+  CASE when DataSourcePeriod like '%Y%' THEN 'FY'               
+  when DataSourcePeriod like '%Q1' THEN 'FQ1'                 
+  when DataSourcePeriod like '%Q2' THEN 'FQ2'                 
+  when DataSourcePeriod like '%Q3' THEN 'FQ3'                 
+  when DataSourcePeriod like '%Q4' THEN 'FQ4'               
+  when DataSourcePeriod like '%L'  THEN 'LTM'         
+  when DataSourcePeriod like '%H1'  THEN 'FH1'         
+  when DataSourcePeriod like '%H2'  THEN 'FH2'             
+  END as FiscalPeriodGAAP                
+   ,FiscalYear as DateField         
+  INTO #tempdatasource_Final                
+  from #tempdatasource        
+       
+ CREATE INDEX IX_#tempdatasource_Final on #tempdatasource_Final(listpos)       
+       
+ CREATE table #MnemonicsCollection      
+ (      
+  CIQ048400 numeric(18,6), CIQ048401 numeric(18,6),CIQ048402 numeric(18,6),CIQ048403 numeric(18,6),CIQ048404 numeric(18,6),CIQ048405 numeric(18,6),CIQ048406 numeric(18,6),      
+  CIQ048407 numeric(18,6),CIQ048408 numeric(18,6), CIQ048409 numeric(18,6),CIQ048410 numeric(18,6),CIQ048412 numeric(18,6),CIQ048413 numeric(18,6),      
+  CIQ048414 numeric(18,6),CIQ048416 numeric(18,6),CIQ048417 numeric(18,6),CIQ048418 numeric(18,6),CIQ048419 numeric(18,6),      
+  CIQ048421 numeric(18,6),CIQ048422 numeric(18,6),CIQ048423 numeric(18,6),CIQ048424 numeric(18,6),CIQ048425 numeric(18,6),CIQ048426 numeric(18,6),CIQ048427 numeric(18,6),      
+  CIQ048428 numeric(18,6),CIQ048429 numeric(18,6),CIQ048431 numeric(18,6),CIQ048433 numeric(18,6),CIQ048434 numeric(18,6),      
+  CIQ048435 numeric(18,6),CIQ048436 numeric(18,6),CIQ048437 numeric(18,6),CIQ048438 numeric(18,6), CIQ048439 numeric(18,6),CIQ048440 numeric(18,6),CIQ048441 numeric(18,6),      
+  CIQ048442 numeric(18,6),CIQ048443 numeric(18,6),CIQ048445 numeric(18,6),CIQ048446 numeric(18,6),CIQ048447 numeric(18,6),CIQ048448 numeric(18,6),      
+  CIQ048449 numeric(18,6),CIQ048451 numeric(18,6),CIQ048452 numeric(18,6),CIQ048453 numeric(18,6),CIQ049753 numeric(18,6),CIQ049754 numeric(18,6),CIQ049755 numeric(18,6),
+  CIQ049756 numeric(18,6),CIQ049757 numeric(18,6),CIQ049758 numeric(18,6),CIQ049759 numeric(18,6),CIQ049760 numeric(18,6),CIQ049761 numeric(18,6),CIQ049762 numeric(18,6),
+  CIQ048454 numeric(18,6),CIQ048455 numeric(18,6),      
+  CIQ048456 numeric(18,6),CIQ048457 numeric(18,6),CIQ048458 numeric(18,6),CIQ048459 numeric(18,6),CIQ048460 numeric(18,6),CIQ048461 numeric(18,6),CIQ048462 numeric(18,6),      
+  CIQ048463 numeric(18,6),CIQ048464 numeric(18,6),CIQ048466 numeric(18,6),CIQ048467 numeric(18,6),CIQ048468 numeric(18,6),CIQ048469 numeric(18,6),      
+  CIQ048471 numeric(18,6),CIQ048472 numeric(18,6),CIQ048473 numeric(18,6),CIQ048474 numeric(18,6),CIQ048475 numeric(18,6),CIQ048476 numeric(18,6),      
+  CIQ048477 numeric(18,6),CIQ048478 numeric(18,6),CIQ048479 numeric(18,6),CIQ048480 numeric(18,6),CIQ048481 numeric(18,6),CIQ048482 numeric(18,6),CIQ048486 numeric(18,6),
+  CIQ048500 numeric(18,6),CIQ048501 numeric(18,6),CIQ048502 numeric(18,6),CIQ048503 numeric(18,6),CIQ048504 numeric(18,6),      
+  CIQ048505 numeric(18,6),CIQ048506 numeric(18,6),CIQ048507 numeric(18,6),CIQ048508 numeric(18,6),CIQ048509 numeric(18,6),CIQ048510 numeric(18,6),CIQ048511 numeric(18,6),      
+  CIQ048512 numeric(18,6),CIQ048513 numeric(18,6),CIQ048514 numeric(18,6),CIQ048516 numeric(18,6),CIQ048517 numeric(18,6),CIQ048518 numeric(18,6),      
+  CIQ048519 numeric(18,6),CIQ048521 numeric(18,6),CIQ048522 numeric(18,6),CIQ048523 numeric(18,6),CIQ048524 numeric(18,6),CIQ048525 numeric(18,6),      
+  CIQ048526 numeric(18,6),CIQ048527 numeric(18,6),CIQ048528 numeric(18,6),CIQ048529 numeric(18,6),CIQ048530 numeric(18,6),CIQ048534 numeric(18,6),CIQ048548 numeric(18,6),CIQ048549 numeric(18,6),CIQ048550 numeric(18,6),CIQ048551 numeric(18,6),CIQ048552 numeric(18,6),CIQ048553 numeric(18,6),      
+  CIQ048554 numeric(18,6),CIQ048555 numeric(18,6),CIQ048556 numeric(18,6),CIQ048557 numeric(18,6),CIQ048558 numeric(18,6),CIQ048559 numeric(18,6),CIQ048560 numeric(18,6),      
+  CIQ048561 numeric(18,6),CIQ048562 numeric(18,6),CIQ048563 numeric(18,6),CIQ048564 numeric(18,6),CIQ048566 numeric(18,6),CIQ048567 numeric(18,6),      
+  CIQ048568 numeric(18,6),CIQ048569 numeric(18,6),CIQ048571 numeric(18,6),CIQ048572 numeric(18,6),CIQ048573 numeric(18,6),CIQ048574 numeric(18,6),      
+  CIQ048575 numeric(18,6),CIQ048576 numeric(18,6),CIQ048577 numeric(18,6),CIQ048578 numeric(18,6),CIQ048579 numeric(18,6),CIQ048581 numeric(18,6),      
+  CIQ048582 numeric(18,6),CIQ048583 numeric(18,6),CIQ048584 numeric(18,6),CIQ048585 numeric(18,6),CIQ048586 numeric(18,6),CIQ048587 numeric(18,6),CIQ048588 numeric(18,6),      
+  CIQ048589 numeric(18,6),CIQ048590 numeric(18,6),CIQ048591 numeric(18,6),      
+  CIQ048596 numeric(18,6),CIQ048597 numeric(18,6),CIQ048598 numeric(18,6),CIQ048599 numeric(18,6),CIQ048600 numeric(18,6),CIQ048602 numeric(18,6),      
+  CIQ048607 numeric(18,6),CIQ048608 numeric(18,6),CIQ048610 numeric(18,6),CIQ048611 numeric(18,6),CIQ048613 numeric(18,6),      
+  CIQ048652 numeric(18,6),CIQ048653 numeric(18,6),CIQ048654 numeric(18,6),CIQ048655 numeric(18,6),CIQ048656 numeric(18,6),CIQ048657 numeric(18,6),CIQ048658 numeric(18,6),      
+  CIQ048659 numeric(18,6),CIQ048660 numeric(18,6),CIQ048661 numeric(18,6),CIQ048663 numeric(18,6),CIQ048664 numeric(18,6),      
+  CIQ048666 numeric(18,6),CIQ048667 numeric(18,6),CIQ048668 numeric(18,6),CIQ048669 numeric(18,6),CIQ048671 numeric(18,6),CIQ048672 numeric(18,6),      
+  CIQ048673 numeric(18,6),CIQ048675 numeric(18,6),CIQ048676 numeric(18,6),CIQ048677 numeric(18,6),CIQ048679 numeric(18,6),    
+  CIQ048680 numeric(18,6),CIQ048681 numeric(18,6),CIQ048682 numeric(18,6),CIQ048683 numeric(18,6),CIQ048684 numeric(18,6),CIQ048685 numeric(18,6),CIQ048686 numeric(18,6),      
+  CIQ048687 numeric(18,6),CIQ048688 numeric(18,6),CIQ048689 numeric(18,6),CIQ048690 numeric(18,6),CIQ048691 numeric(18,6),CIQ048692 numeric(18,6),CIQ048693 numeric(18,6),      
+  CIQ048694 numeric(18,6),CIQ048695 numeric(18,6),CIQ048696 numeric(18,6),CIQ048697 numeric(18,6),CIQ048698 numeric(18,6),CIQ048699 numeric(18,6),      
+  CIQ048701 numeric(18,6),CIQ048702 numeric(18,6),CIQ048703 numeric(18,6),CIQ048704 numeric(18,6),CIQ048705 numeric(18,6),CIQ048706 numeric(18,6),CIQ048707 numeric(18,6),      
+ CIQ048708 numeric(18,6),CIQ049763 numeric(18,6),CIQ049764 numeric(18,6),CIQ049765 numeric(18,6),CIQ049766 numeric(18,6),CIQ049767 numeric(18,6),CIQ049768 numeric(18,6),
+  CIQ049769 numeric(18,6),CIQ049770 numeric(18,6),CIQ049771 numeric(18,6),CIQ049772 numeric(18,6),CIQ049773 numeric(18,6),CIQ049774 numeric(18,6),CIQ049775 numeric(18,6),
+  CIQ049776 numeric(18,6),CIQ049777 numeric(18,6),CIQ049778 numeric(18,6),CIQ049779 numeric(18,6),CIQ049780 numeric(18,6),CIQ049781 numeric(18,6),CIQ049782 numeric(18,6),
+  CIQ049783 numeric(18,6),CIQ049784 numeric(18,6),CIQ049785 numeric(18,6),CIQ049787 numeric(18,6),CIQ049789 numeric(18,6),CIQ049790 numeric(18,6),CIQ050045 numeric(18,6),
+  CIQ049791 numeric(18,6),CIQ049792 numeric(18,6),CIQ049793 numeric(18,6),CIQ049794 numeric(18,6),CIQ049795 numeric(18,6),CIQ049796 numeric(18,6),CIQ049797 numeric(18,6),
+  CIQ049798 numeric(18,6),CIQ049799 numeric(18,6),CIQ049800 numeric(18,6),CIQ049801 numeric(18,6),CIQ049802 numeric(18,6),CIQ049803 numeric(18,6),CIQ049804 numeric(18,6),
+  CIQ049805 numeric(18,6),CIQ049806 numeric(18,6),CIQ049807 numeric(18,6),CIQ049808 numeric(18,6),CIQ049809 numeric(18,6),CIQ049810 numeric(18,6),CIQ049812 numeric(18,6),
+  CIQ049814 numeric(18,6),CIQ050046 numeric(18,6),CIQ049815 numeric(18,6),CIQ049816 numeric(18,6),CIQ049817 numeric(18,6),CIQ049819 numeric(18,6),CIQ050047 numeric(18,6),
+  CIQ049820 numeric(18,6),CIQ049821 numeric(18,6),CIQ049822 numeric(18,6),CIQ049823 numeric(18,6),CIQ049844 numeric(18,6),CIQ049845 numeric(18,6),CIQ049846 numeric(18,6),
+  CIQ049847 numeric(18,6),CIQ050048 numeric(18,6),CIQ049825 numeric(18,6),CIQ049826 numeric(18,6),CIQ049827 numeric(18,6),CIQ049828 numeric(18,6),CIQ049824 numeric(18,6),
+  CIQ049829 numeric(18,6),CIQ049830 numeric(18,6),CIQ049831 numeric(18,6),CIQ049832 numeric(18,6),CIQ049833 numeric(18,6),CIQ049839 numeric(18,6),CIQ049834 numeric(18,6),
+  CIQ049835 numeric(18,6),CIQ049836 numeric(18,6),CIQ049837 numeric(18,6),CIQ049838 numeric(18,6),CIQ049841 numeric(18,6),CIQ049842 numeric(18,6),CIQ049843 numeric(18,6),
+  ReportedLeaseLiabilitiesDebt numeric(18,6),LeaseLiabAdjToDebt numeric(18,6), MultiEmployerPensionPlanDebt numeric(18,6), IncrementalLeaseEarning numeric(18,6),      
+  IncomeUnconsolidatedCompany numeric(18,6), IncrementalLeaseOpIncome numeric(18,6), IncrementalLeaseInterestExp numeric(18,6), CashTaxesPaidEarning numeric(18,6),      
+  CashTaxesPaidOtherEarning numeric(18,6), CashInterestPaid numeric(18,6), CashInterestPaidOther numeric(18,6), IncremLeaseFundOperation numeric(18,6),      
+  IncrementalLeaseCashFlowOper numeric(18,6), FiscalYear int, KeyCurrency varchar(20), DateEnded datetime, DateBegun datetime, MagnitudeMultiplier varchar(20), CSDLastUpdate datetime,      
+  FiscalQuarter varchar(20) ,      
+  RatingReviewStatus NVARCHAR(20)      
+ )      
+      
+      
+      
+ DECLARE @KeyRatingentity UNIQUEIDENTIFIER      
+     
+    
+    
+ SELECT @KeyRatingentity =re.KeyRatingEntity FROM objectviews..ratingentity re       
+ WHERE     
+ KEYINSTN=@keyinstn AND ISPRIMARY=1 AND re.OIDVENDOR is not null AND re.KEYINSTNRATINGAGENCY=3000325       
+ AND re.KeySPGRCorpFISource = 0     
+ AND csdData=1     
+      
+ /*      
+  Declare @FiscalYearEnd INT = (SELECT MAX(SS.FiscalYear) FROM objectviews..SPGRCorpFIFinlPeriod SS       
+                                                              INNER JOIN objectviews..SPGRCorpFIFinl fif1 on SS.KeySPGRCorpFIFinl = fif1.KeySPGRCorpFIFinl AND SS.FiscalQuarter ='Y'      
+                                                              INNER JOIN objectviews..SPGRCorpFIFinlEOP feop on fif1.KeySPGRCorpFIFinlEOP = feop.KeySPGRCorpFIFinlEOP      
+                                                              INNER JOIN objectviews..RatingEntity re on re.KeyRatingEntity = feop.KeyRatingEntity      
+                                                              where re.KeyRatingEntity =@KeyRatingentity)      
+  Declare @FiscalYearStart INT      
+  Set @FiscalYearStart = @FiscalYearEnd - 4      
+ */      
+  Declare @BeginFlag INT = 1             
+                
+  WHILE (@BeginFlag <= @Count)                  
+  BEGIN       
+       
+  INSERT into #MnemonicsCollection      
+   SELECT        
+     ISNULL(feop.CIQ048400, 0) CIQ048400,      
+     ISNULL(feop.CIQ048401, 0) CIQ048401,      
+     ISNULL(feop.CIQ048402, 0) CIQ048402,      
+     ISNULL(feop.CIQ048403, 0) CIQ048403,      
+     ISNULL(feop.CIQ048404, 0) CIQ048404,      
+     ISNULL(feop.CIQ048405, 0) CIQ048405,      
+     ISNULL(feop.CIQ048406, 0) CIQ048406,      
+     ISNULL(feop.CIQ048407, 0) CIQ048407,      
+     ISNULL(feop.CIQ048408, 0) CIQ048408,      
+     ISNULL(feop.CIQ048409, 0) CIQ048409,      
+     ISNULL(feop.CIQ048410, 0) CIQ048410,      
+     ISNULL(feop.CIQ048412, 0) CIQ048412,      
+     ISNULL(feop.CIQ048413, 0) CIQ048413,      
+     ISNULL(feop.CIQ048414, 0) CIQ048414,      
+     ISNULL(feop.CIQ048416, 0) CIQ048416,      
+     ISNULL(feop.CIQ048417, 0) CIQ048417,      
+     ISNULL(feop.CIQ048418, 0) CIQ048418,      
+     ISNULL(feop.CIQ048419, 0) CIQ048419,      
+     ISNULL(feop.CIQ048421, 0) CIQ048421,      
+     ISNULL(feop.CIQ048422, 0) CIQ048422,      
+     ISNULL(feop.CIQ048423, 0) CIQ048423,      
+     ISNULL(feop.CIQ048424, 0) CIQ048424,      
+     ISNULL(feop.CIQ048425, 0) CIQ048425,      
+  ISNULL(feop.CIQ048426, 0) CIQ048426,      
+     ISNULL(feop.CIQ048427, 0) CIQ048427,      
+     ISNULL(feop.CIQ048428, 0) CIQ048428,      
+     ISNULL(feop.CIQ048429, 0) CIQ048429,      
+     ISNULL(feop.CIQ048431, 0) CIQ048431,      
+     ISNULL(feop.CIQ048433, 0) CIQ048433,      
+     ISNULL(feop.CIQ048434, 0) CIQ048434,      
+     ISNULL(feop.CIQ048435, 0) CIQ048435,      
+     ISNULL(feop.CIQ048436, 0) CIQ048436,      
+     ISNULL(feop.CIQ048437, 0) CIQ048437,      
+     ISNULL(feop.CIQ048438, 0) CIQ048438,      
+      
+     ISNULL(feop.CIQ048439, 0) CIQ048439,      
+     ISNULL(feop.CIQ048440, 0) CIQ048440,      
+     ISNULL(feop.CIQ048441, 0) CIQ048441,      
+     ISNULL(feop.CIQ048442, 0) CIQ048442,      
+     ISNULL(feop.CIQ048443, 0) CIQ048443,      
+     ISNULL(feop.CIQ048445, 0) CIQ048445,      
+     ISNULL(feop.CIQ048446, 0) CIQ048446,      
+     ISNULL(feop.CIQ048447, 0) CIQ048447,      
+     ISNULL(feop.CIQ048448, 0) CIQ048448,      
+     ISNULL(feop.CIQ048449, 0) CIQ048449,      
+     ISNULL(feop.CIQ048451, 0) CIQ048451,      
+     ISNULL(feop.CIQ048452, 0) CIQ048452,      
+     ISNULL(feop.CIQ048453, 0) CIQ048453,      
+     
+	 ISNULL(feop.CIQ049753, 0) CIQ049753, -- Mnemonics changes for 25.09
+	 ISNULL(feop.CIQ049754, 0) CIQ049754,
+	 ISNULL(feop.CIQ049755, 0) CIQ049755,
+	 ISNULL(feop.CIQ049756, 0) CIQ049756,
+	 ISNULL(feop.CIQ049757, 0) CIQ049757,
+	 ISNULL(feop.CIQ049758, 0) CIQ049758,
+	 ISNULL(feop.CIQ049759, 0) CIQ049759,
+	 ISNULL(feop.CIQ049760, 0) CIQ049760,
+	 ISNULL(feop.CIQ049761, 0) CIQ049761,
+	 ISNULL(feop.CIQ049762, 0) CIQ049762,
+
+     ISNULL(fif1.CIQ048454, 0) CIQ048454,      
+     ISNULL(fif1.CIQ048455, 0) CIQ048455,      
+     ISNULL(fif1.CIQ048456, 0) CIQ048456,      
+     ISNULL(fif1.CIQ048457, 0) CIQ048457,      
+     ISNULL(fif1.CIQ048458, 0) CIQ048458,      
+     ISNULL(fif1.CIQ048459, 0) CIQ048459,      
+     ISNULL(fif1.CIQ048460, 0) CIQ048460,      
+     ISNULL(fif1.CIQ048461, 0) CIQ048461,      
+     ISNULL(fif1.CIQ048462, 0) CIQ048462,      
+     ISNULL(fif1.CIQ048463, 0) CIQ048463,      
+      
+     ISNULL(fif1.CIQ048464, 0)  CIQ048464,      
+     ISNULL(fif1.CIQ048466, 0)  CIQ048466,      
+     ISNULL(fif1.CIQ048467, 0)  CIQ048467,      
+     ISNULL(fif1.CIQ048468, 0)  CIQ048468,      
+     ISNULL(fif1.CIQ048469, 0)  CIQ048469,      
+     ISNULL(fif1.CIQ048471, 0)  CIQ048471,      
+     ISNULL(fif1.CIQ048472, 0)  CIQ048472,      
+     ISNULL(fif1.CIQ048473, 0)  CIQ048473,      
+     ISNULL(fif1.CIQ048474, 0)  CIQ048474,      
+     ISNULL(fif1.CIQ048475, 0)  CIQ048475,      
+     ISNULL(fif1.CIQ048476, 0)  CIQ048476,      
+     ISNULL(fif1.CIQ048477, 0)  CIQ048477,      
+     ISNULL(fif1.CIQ048478, 0)  CIQ048478,      
+     ISNULL(fif1.CIQ048479, 0)  CIQ048479,      
+     ISNULL(fif1.CIQ048480, 0)  CIQ048480,      
+     ISNULL(fif1.CIQ048481, 0)  CIQ048481,      
+     ISNULL(fif1.CIQ048482, 0)  CIQ048482,       
+     ISNULL(fif1.CIQ048486, 0)  CIQ048486,      
+     ISNULL(fif1.CIQ048500, 0)  CIQ048500,      
+     ISNULL(fif1.CIQ048501, 0)  CIQ048501,      
+     ISNULL(fif1.CIQ048502, 0)  CIQ048502,      
+     ISNULL(fif1.CIQ048503, 0)  CIQ048503,      
+     ISNULL(fif1.CIQ048504, 0)  CIQ048504,      
+     ISNULL(fif1.CIQ048505, 0)  CIQ048505,      
+     ISNULL(fif1.CIQ048506, 0)  CIQ048506,      
+     ISNULL(fif1.CIQ048507, 0)  CIQ048507,      
+     ISNULL(fif1.CIQ048508, 0)  CIQ048508,      
+     ISNULL(fif1.CIQ048509, 0)  CIQ048509,      
+   ISNULL(fif1.CIQ048510, 0)  CIQ048510,      
+   ISNULL(fif1.CIQ048511, 0)  CIQ048511,      
+     ISNULL(fif1.CIQ048512, 0)  CIQ048512,      
+     ISNULL(fif1.CIQ048513, 0)  CIQ048513,      
+      
+     ISNULL(fif1.CIQ048514, 0)  CIQ048514,            
+     ISNULL(fif1.CIQ048516, 0)  CIQ048516,      
+     ISNULL(fif1.CIQ048517, 0)  CIQ048517,      
+     ISNULL(fif1.CIQ048518, 0)  CIQ048518,      
+     ISNULL(fif1.CIQ048519, 0)  CIQ048519,      
+     ISNULL(fif1.CIQ048521, 0)  CIQ048521,      
+     ISNULL(fif1.CIQ048522, 0)  CIQ048522,      
+     ISNULL(fif1.CIQ048523, 0)  CIQ048523,      
+     ISNULL(fif1.CIQ048524, 0)  CIQ048524,      
+     ISNULL(fif1.CIQ048525, 0)  CIQ048525,      
+     ISNULL(fif1.CIQ048526, 0)  CIQ048526,      
+     ISNULL(fif1.CIQ048527, 0)  CIQ048527,      
+     ISNULL(fif1.CIQ048528, 0)  CIQ048528,      
+     ISNULL(fif1.CIQ048529, 0)  CIQ048529,      
+     ISNULL(fif1.CIQ048530, 0)  CIQ048530,      
+     ISNULL(fif1.CIQ048534, 0)  CIQ048534,      
+     ISNULL(fif1.CIQ048548, 0)  CIQ048548,      
+     ISNULL(fif1.CIQ048549, 0)  CIQ048549,      
+     ISNULL(fif1.CIQ048550, 0)  CIQ048550,      
+     ISNULL(fif1.CIQ048551, 0)  CIQ048551,      
+     ISNULL(fif1.CIQ048552, 0)  CIQ048552,      
+     ISNULL(fif1.CIQ048553, 0)  CIQ048553,      
+     ISNULL(fif1.CIQ048554, 0)  CIQ048554,      
+     ISNULL(fif1.CIQ048555, 0)  CIQ048555,      
+     ISNULL(fif1.CIQ048556, 0)  CIQ048556,      
+     ISNULL(fif1.CIQ048557, 0)  CIQ048557,      
+     ISNULL(fif1.CIQ048558, 0)  CIQ048558,      
+     ISNULL(fif1.CIQ048559, 0)  CIQ048559,      
+     ISNULL(fif1.CIQ048560, 0)  CIQ048560,      
+     ISNULL(fif1.CIQ048561, 0)  CIQ048561,      
+     ISNULL(fif1.CIQ048562, 0)  CIQ048562,      
+     ISNULL(fif1.CIQ048563, 0)  CIQ048563,      
+     ISNULL(fif1.CIQ048564, 0)  CIQ048564,      
+     ISNULL(fif1.CIQ048566, 0)  CIQ048566,      
+     ISNULL(fif1.CIQ048567, 0)  CIQ048567,      
+     ISNULL(fif1.CIQ048568, 0)  CIQ048568,      
+      
+     ISNULL(fif1.CIQ048569, 0) CIQ048569,      
+     ISNULL(fif1.CIQ048571, 0) CIQ048571,      
+     ISNULL(fif1.CIQ048572, 0) CIQ048572,      
+     ISNULL(fif1.CIQ048573, 0) CIQ048573,      
+     ISNULL(fif1.CIQ048574, 0) CIQ048574,      
+     ISNULL(fif1.CIQ048575, 0) CIQ048575,      
+     ISNULL(fif1.CIQ048576, 0) CIQ048576,      
+     ISNULL(fif1.CIQ048577, 0) CIQ048577,      
+     ISNULL(fif1.CIQ048578, 0) CIQ048578,      
+     ISNULL(fif1.CIQ048579, 0) CIQ048579,      
+     ISNULL(fif1.CIQ048581, 0) CIQ048581,      
+     ISNULL(fif1.CIQ048582, 0) CIQ048582,      
+     ISNULL(fif1.CIQ048583, 0) CIQ048583,      
+     ISNULL(fif1.CIQ048584, 0) CIQ048584,      
+     ISNULL(fif1.CIQ048585, 0) CIQ048585,      
+     ISNULL(fif1.CIQ048586, 0) CIQ048586,      
+     ISNULL(fif1.CIQ048587, 0) CIQ048587,      
+     ISNULL(fif1.CIQ048588, 0) CIQ048588,      
+     ISNULL(fif1.CIQ048589, 0) CIQ048589,      
+     ISNULL(fif1.CIQ048590, 0) CIQ048590,      
+      
+     ISNULL(fif1.CIQ048591, 0) CIQ048591,      
+     ISNULL(fif1.CIQ048596, 0) CIQ048596,    
+     ISNULL(fif1.CIQ048597, 0) CIQ048597,      
+    ISNULL(fif1.CIQ048598, 0) CIQ048598,      
+     ISNULL(fif1.CIQ048599, 0) CIQ048599,      
+     ISNULL(fif1.CIQ048600, 0) CIQ048600,      
+     ISNULL(fif1.CIQ048602, 0) CIQ048602,      
+     ISNULL(fif1.CIQ048607, 0) CIQ048607,      
+     ISNULL(fif1.CIQ048608, 0) CIQ048608,      
+     ISNULL(fif1.CIQ048610, 0) CIQ048610,      
+     ISNULL(fif1.CIQ048611, 0) CIQ048611,      
+     ISNULL(fif1.CIQ048613, 0) CIQ048613,      
+     ISNULL(fif1.CIQ048652, 0) CIQ048652,      
+     ISNULL(fif1.CIQ048653, 0) CIQ048653,      
+     ISNULL(fif1.CIQ048654, 0) CIQ048654,      
+      
+     ISNULL(fif1.CIQ048655, 0) CIQ048655,      
+     ISNULL(fif1.CIQ048656, 0) CIQ048656,      
+     ISNULL(fif1.CIQ048657, 0) CIQ048657,      
+     ISNULL(fif1.CIQ048658, 0) CIQ048658,      
+     ISNULL(fif1.CIQ048659, 0) CIQ048659,      
+     ISNULL(fif1.CIQ048660, 0) CIQ048660,      
+     ISNULL(fif1.CIQ048661, 0) CIQ048661,      
+           
+     ISNULL(fif1.CIQ048663, 0) CIQ048663,      
+     ISNULL(fif1.CIQ048664, 0) CIQ048664,      
+     ISNULL(fif1.CIQ048666, 0) CIQ048666,      
+     ISNULL(fif1.CIQ048667, 0) CIQ048667,      
+     ISNULL(fif1.CIQ048668, 0) CIQ048668,      
+     ISNULL(fif1.CIQ048669, 0) CIQ048669,      
+           
+     ISNULL(fif1.CIQ048671, 0) CIQ048671,      
+     ISNULL(fif1.CIQ048672, 0) CIQ048672,      
+     ISNULL(fif1.CIQ048673, 0) CIQ048673,            
+     ISNULL(fif1.CIQ048675, 0) CIQ048675,      
+     ISNULL(fif1.CIQ048676, 0) CIQ048676,      
+     ISNULL(fif1.CIQ048677, 0) CIQ048677,      
+     ISNULL(fif1.CIQ048679, 0) CIQ048679,      
+     ISNULL(fif1.CIQ048680, 0) CIQ048680,      
+     ISNULL(fif1.CIQ048681, 0) CIQ048681,      
+     ISNULL(fif1.CIQ048682, 0) CIQ048682,      
+     ISNULL(fif1.CIQ048683, 0) CIQ048683,      
+     ISNULL(fif1.CIQ048684, 0) CIQ048684,      
+     ISNULL(fif1.CIQ048685, 0) CIQ048685,      
+     ISNULL(fif1.CIQ048686, 0) CIQ048686,      
+     ISNULL(fif1.CIQ048687, 0) CIQ048687,      
+      
+     ISNULL(fif1.CIQ048688, 0) CIQ048688,      
+     ISNULL(fif1.CIQ048689, 0) CIQ048689,      
+     ISNULL(fif1.CIQ048690, 0) CIQ048690,      
+     ISNULL(fif1.CIQ048691, 0) CIQ048691,      
+     ISNULL(fif1.CIQ048692, 0) CIQ048692,      
+     ISNULL(fif1.CIQ048693, 0) CIQ048693,      
+     ISNULL(fif1.CIQ048694, 0) CIQ048694,      
+     ISNULL(fif1.CIQ048695, 0) CIQ048695,      
+     ISNULL(fif1.CIQ048696, 0) CIQ048696,      
+      
+     ISNULL(fif1.CIQ048697, 0) CIQ048697,      
+     ISNULL(fif1.CIQ048698, 0) CIQ048698,      
+     ISNULL(fif1.CIQ048699, 0) CIQ048699,      
+     ISNULL(fif1.CIQ048701, 0) CIQ048701,      
+     ISNULL(fif1.CIQ048702, 0) CIQ048702,      
+     ISNULL(fif1.CIQ048703, 0) CIQ048703,      
+     ISNULL(fif1.CIQ048704, 0) CIQ048704,      
+     ISNULL(fif1.CIQ048705, 0) CIQ048705,      
+     ISNULL(fif1.CIQ048706, 0) CIQ048706,      
+     ISNULL(fif1.CIQ048707, 0) CIQ048707,      
+     ISNULL(fif1.CIQ048708, 0) CIQ048708,      
+           
+	 ISNULL(fif2.CIQ049763, 0) CIQ049763, -- Mnemonics changes for 25.09
+	 ISNULL(fif2.CIQ049764, 0) CIQ049764,
+	 ISNULL(fif2.CIQ049765, 0) CIQ049765,
+	 ISNULL(fif2.CIQ049766, 0) CIQ049766,
+	 ISNULL(fif2.CIQ049767, 0) CIQ049767,
+	 ISNULL(fif2.CIQ049768, 0) CIQ049768,
+
+	 ISNULL(fif2.CIQ049769, 0) CIQ049769,
+	 ISNULL(fif2.CIQ049770, 0) CIQ049770,
+	 ISNULL(fif2.CIQ049771, 0) CIQ049771,
+	 ISNULL(fif2.CIQ049772, 0) CIQ049772,
+	 ISNULL(fif2.CIQ049773, 0) CIQ049773,
+	 ISNULL(fif2.CIQ049774, 0) CIQ049774,
+	 ISNULL(fif2.CIQ049775, 0) CIQ049775,
+	 ISNULL(fif2.CIQ049776, 0) CIQ049776,
+	 ISNULL(fif2.CIQ049777, 0) CIQ049777,
+	 ISNULL(fif2.CIQ049778, 0) CIQ049778,
+	 ISNULL(fif2.CIQ049779, 0) CIQ049779,
+	 ISNULL(fif2.CIQ049780, 0) CIQ049780,
+	 ISNULL(fif2.CIQ049781, 0) CIQ049781,
+	 ISNULL(fif2.CIQ049782, 0) CIQ049782,
+	 ISNULL(fif2.CIQ049783, 0) CIQ049783,
+	 ISNULL(fif2.CIQ049784, 0) CIQ049784,
+	 ISNULL(fif2.CIQ049785, 0) CIQ049785,
+	 ISNULL(fif2.CIQ049787, 0) CIQ049787,
+	 ISNULL(fif2.CIQ049789, 0) CIQ049789,
+	 ISNULL(fif2.CIQ049790, 0) CIQ049790,
+	 ISNULL(fif2.CIQ050045, 0) CIQ050045,
+	 ISNULL(fif2.CIQ049791, 0) CIQ049791,
+	 ISNULL(fif2.CIQ049792, 0) CIQ049792,
+	 ISNULL(fif2.CIQ049793, 0) CIQ049793,
+
+	 ISNULL(fif2.CIQ049794, 0) CIQ049794,
+	 ISNULL(fif2.CIQ049795, 0) CIQ049795,
+	 ISNULL(fif2.CIQ049796, 0) CIQ049796,
+	 ISNULL(fif2.CIQ049797, 0) CIQ049797,
+	 ISNULL(fif2.CIQ049798, 0) CIQ049798,
+	 ISNULL(fif2.CIQ049799, 0) CIQ049799,
+	 ISNULL(fif2.CIQ049800, 0) CIQ049800,
+	 ISNULL(fif2.CIQ049801, 0) CIQ049801,
+	 ISNULL(fif2.CIQ049802, 0) CIQ049802,
+	 ISNULL(fif2.CIQ049803, 0) CIQ049803,
+	 ISNULL(fif2.CIQ049804, 0) CIQ049804,
+	 ISNULL(fif2.CIQ049805, 0) CIQ049805,
+	 ISNULL(fif2.CIQ049806, 0) CIQ049806,
+	 ISNULL(fif2.CIQ049807, 0) CIQ049807,
+	 ISNULL(fif2.CIQ049808, 0) CIQ049808,
+	 ISNULL(fif2.CIQ049809, 0) CIQ049809,
+	 ISNULL(fif2.CIQ049810, 0) CIQ049810,
+	 ISNULL(fif2.CIQ049812, 0) CIQ049812,
+	 ISNULL(fif2.CIQ049814, 0) CIQ049814,
+	 ISNULL(fif2.CIQ050046, 0) CIQ050046,
+	 ISNULL(fif2.CIQ049815, 0) CIQ049815,
+	 ISNULL(fif2.CIQ049816, 0) CIQ049816,
+	 ISNULL(fif2.CIQ049817, 0) CIQ049817,
+	 ISNULL(fif2.CIQ049819, 0) CIQ049819,
+	 ISNULL(fif2.CIQ050047, 0) CIQ050047,
+
+	 ISNULL(fif2.CIQ049820, 0) CIQ049820,
+	 ISNULL(fif2.CIQ049821, 0) CIQ049821,
+	 ISNULL(fif2.CIQ049822, 0) CIQ049822,
+	 ISNULL(fif2.CIQ049823, 0) CIQ049823,
+	 ISNULL(fif2.CIQ049844, 0) CIQ049844,
+	 ISNULL(fif2.CIQ049845, 0) CIQ049845, 
+	 ISNULL(fif2.CIQ049846, 0) CIQ049846, 
+	 ISNULL(fif2.CIQ049847, 0) CIQ049847, 
+
+	 ISNULL(fif2.CIQ050048, 0) CIQ050048,  
+	 ISNULL(fif2.CIQ049825, 0) CIQ049825, 
+	 ISNULL(fif2.CIQ049826, 0) CIQ049826, 
+	 ISNULL(fif2.CIQ049827, 0) CIQ049827, 
+	 ISNULL(fif2.CIQ049828, 0) CIQ049828, 
+	 ISNULL(fif2.CIQ049824, 0) CIQ049824, 
+	 ISNULL(fif2.CIQ049829, 0) CIQ049829, 
+	 ISNULL(fif2.CIQ049830, 0) CIQ049830,
+
+	 ISNULL(fif2.CIQ049831, 0) CIQ049831,
+	 ISNULL(fif2.CIQ049832, 0) CIQ049832,
+	 ISNULL(fif2.CIQ049833, 0) CIQ049833,
+	 ISNULL(fif2.CIQ049839, 0) CIQ049839,
+	 ISNULL(fif2.CIQ049834, 0) CIQ049834,
+	 ISNULL(fif2.CIQ049835, 0) CIQ049835,
+	 ISNULL(fif2.CIQ049836, 0) CIQ049836,
+	 ISNULL(fif2.CIQ049837, 0) CIQ049837,
+	 ISNULL(fif2.CIQ049838, 0) CIQ049838,
+	 ISNULL(fif2.CIQ049841, 0) CIQ049841,
+	 ISNULL(fif2.CIQ049842, 0) CIQ049842,
+	 ISNULL(fif2.CIQ049843, 0) CIQ049843,
+
+     ISNULL(feop.ReportedLeaseLiabilitiesDebt, 0) as ReportedLeaseLiabilitiesDebt,      
+     ISNULL(feop.LeaseLiabAdjToDebt, 0) as LeaseLiabAdjToDebt,      
+     ISNULL(feop.MultiEmployerPensionPlanDebt, 0) as MultiEmployerPensionPlanDebt,      
+     ISNULL(fif1.IncrementalLeaseEarning, 0) as IncrementalLeaseEarning,      
+     ISNULL(fif1.IncomeUnconsolidatedCompany, 0) as IncomeUnconsolidatedCompany,      
+     ISNULL(fif1.IncrementalLeaseOpIncome, 0) as IncrementalLeaseOpIncome,      
+     ISNULL(fif1.IncrementalLeaseInterestExp, 0) as IncrementalLeaseInterestExp,      
+     ISNULL(fif1.CashTaxesPaidEarning, 0) as CashTaxesPaidEarning,      
+     ISNULL(fif1.CashTaxesPaidOtherEarning, 0) as CashTaxesPaidOtherEarning,      
+     ISNULL(fif1.CashInterestPaid, 0) as CashInterestPaid,      
+     ISNULL(fif1.CashInterestPaidOther, 0) as CashInterestPaidOther,      
+     ISNULL(fif1.IncremLeaseFundOperation, 0) as IncremLeaseFundOperation,      
+     ISNULL(fif1.IncrementalLeaseCashFlowOper, 0) as IncrementalLeaseCashFlowOper,      
+     period.FiscalYear as FiscalYear,      
+     feop.KeyCurrency AS KeyCurrency,      
+     feop.DateEnded as DateEnded,      
+     fif1.DateBegun as DateBegun,      
+     'Millions' as MagnitudeMultiplier,      
+     period.CSDLastUpdate as CSDLastUpdate ,      
+     period.FiscalQuarter ,      
+     rrs.RatingReviewStatus      
+      
+     FROM  objectviews..SPGRCorpFIFinlEOP feop       
+     INNER JOIN objectviews..SPGRCorpFIFinl fif1 on fif1.KeySPGRCorpFIFinlEOP = feop.KeySPGRCorpFIFinlEOP
+	 INNER JOIN objectviews..SPGRCorpFIFinl2 fif2 on fif2.KeySPGRCorpFIFinlEOP = feop.KeySPGRCorpFIFinlEOP
+     INNER JOIN objectviews..SPGRCorpFIFinlPeriod period ON (fif1.KeySPGRCorpFIFinl = period.KeySPGRCorpFIFinl AND fif2.KeySPGRCorpFIFinl = period.KeySPGRCorpFIFinl)      
+     INNER JOIN objectviews..RatingEntity re on re.KeyRatingEntity = feop.KeyRatingEntity      
+     LEFT OUTER JOIN objectviews..LookupRatingReviewStatus rrs on rrs.KeyRatingReviewStatus = period.KeyRatingReviewStatus      
+     WHERE re.KeyRatingEntity =@KeyRatingentity      
+     --AND Period.FiscalQuarter ='Y'      
+     --AND period.FiscalYear between @FiscalYearStart AND @FiscalYearEnd      
+                          
+     AND period.FiscalYear = SUBSTRING((SELECT DataSourcePeriod from #tempdatasource tds where tds.listpos = @BeginFlag), 1, 4)         
+     AND period.FiscalQuarter = (select FiscalQuarter from #tempdatasource tds2 where tds2.listpos = @BeginFlag)               
+     ORDER BY FiscalYear DESC      
+      
+   SET @BeginFlag = @BeginFlag + 1                  
+   END        
+      
+   SET NOCOUNT OFF       
+      
+   CREATE INDEX ix_#tmp on #MnemonicsCollection(FiscalYear)      
+      
+   --select * from  #MnemonicsCollection      
+      
+  -- INSERT into #MnemonicsCollection_final      
+    SELECT a.* , b.FiscalPeriodGAAP,  b.listpos as [FormOrder|listpos]      
+    into #MnemonicsCollection_final      
+          from #MnemonicsCollection a      
+    LEFT OUTER JOIn #tempdatasource_Final b on a.FiscalYear=b.DateField  and a.FiscalQuarter=b.FiscalQuarter         
+    order by b.listpos asc      
+      
+     --select * from  #MnemonicsCollection_final      
+      
+--======================Before pivotable      
+      
+      
+      
+   CREATE TABLE #Debt      
+ (      
+     [filename|DataPointName] VARCHAR(200),      
+  [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+  [filename|SectionName] VARCHAR(200),      
+     FiscalYear int,      
+  KeyCurrency VARCHAR(200),      
+  DateEnded datetime,      
+  DateBegun datetime,      
+  FormOrder INT,      
+  MagnitudeMultiplier VARCHAR(200),      
+  CSDLastUpdate datetime,      
+  Exchange VARCHAR(200),      
+  ARMISRowNumber INT,      
+  FiscalQuarter varchar(20),      
+  FiscalPeriodGAAP varchar(20)      
+  , RatingReviewStatus varchar(20),
+   [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+             
+ )      
+      
+  CREATE TABLE #ShareholderEquity      
+ (      
+     [filename|DataPointName] VARCHAR(200),      
+  [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+  [filename|SectionName] VARCHAR(200),      
+   FiscalYear int,      
+  KeyCurrency VARCHAR(200),      
+  DateEnded datetime,      
+  DateBegun datetime,      
+  FormOrder INT,      
+  MagnitudeMultiplier VARCHAR(200),      
+  CSDLastUpdate datetime,      
+  Exchange VARCHAR(200),      
+  ARMISRowNumber INT      
+  ,FiscalQuarter varchar(20),      
+  FiscalPeriodGAAP varchar(20)      
+  , RatingReviewStatus varchar(20),
+   [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+             
+ )      
+      
+ CREATE TABLE #Revenues       
+ (      
+        [filename|DataPointName] VARCHAR(200),      
+   [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+   [filename|SectionName] VARCHAR(200),      
+    FiscalYear int,      
+   KeyCurrency VARCHAR(200),     
+   DateEnded datetime,      
+   DateBegun datetime,      
+   FormOrder INT,    
+   MagnitudeMultiplier VARCHAR(200),      
+   CSDLastUpdate datetime,      
+   Exchange VARCHAR(200),      
+   ARMISRowNumber INT      
+   ,FiscalQuarter varchar(20),      
+   FiscalPeriodGAAP varchar(20)      
+   , RatingReviewStatus varchar(20),
+    [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+ )      
+      
+ CREATE TABLE #EBITDA      
+ (      
+     [filename|DataPointName] VARCHAR(200),      
+   [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+  [filename|SectionName] VARCHAR(200),      
+   FiscalYear int,      
+  KeyCurrency VARCHAR(200),      
+  DateEnded datetime,      
+  DateBegun datetime,      
+  FormOrder INT,      
+  MagnitudeMultiplier VARCHAR(200),      
+  CSDLastUpdate datetime,      
+  Exchange VARCHAR(200),      
+  ARMISRowNumber INT      
+  ,FiscalQuarter varchar(20),      
+  FiscalPeriodGAAP varchar(20)      
+  , RatingReviewStatus varchar(20),
+   [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+        
+      
+ )      
+      
+  CREATE TABLE #OperatingIncome      
+ (      
+     [filename|DataPointName] VARCHAR(200),      
+  [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+  [filename|SectionName] VARCHAR(200),      
+  FiscalYear int,      
+  KeyCurrency VARCHAR(200),      
+  DateEnded datetime,      
+  DateBegun datetime,      
+  FormOrder INT,      
+  MagnitudeMultiplier VARCHAR(200),      
+  CSDLastUpdate datetime,      
+  Exchange VARCHAR(200),      
+  ARMISRowNumber INT      
+  ,FiscalQuarter varchar(20),      
+  FiscalPeriodGAAP varchar(20)      
+  , RatingReviewStatus varchar(20),
+   [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+             
+ )      
+      
+ CREATE TABLE #InterestExpense      
+ (      
+       [filename|DataPointName] VARCHAR(200),      
+    [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+    [filename|SectionName] VARCHAR(200),      
+       FiscalYear int,      
+    KeyCurrency VARCHAR(200),      
+    DateEnded datetime,      
+    DateBegun datetime,      
+    FormOrder INT,      
+    MagnitudeMultiplier VARCHAR(200),      
+    CSDLastUpdate datetime,      
+    Exchange VARCHAR(200),      
+    ARMISRowNumber INT      
+    ,FiscalQuarter varchar(20),      
+    FiscalPeriodGAAP varchar(20)      
+    , RatingReviewStatus varchar(20),
+	 [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+               
+ )      
+       
+      
+ CREATE TABLE #EBITDAFFO      
+ (      
+      [filename|DataPointName] VARCHAR(200),      
+    [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+    [filename|SectionName] VARCHAR(200),      
+    FiscalYear int,      
+    KeyCurrency VARCHAR(200),      
+    DateEnded datetime,      
+    DateBegun datetime,      
+    FormOrder INT,      
+    MagnitudeMultiplier VARCHAR(200),      
+    CSDLastUpdate datetime,      
+    Exchange VARCHAR(200),      
+    ARMISRowNumber INT      
+    ,FiscalQuarter varchar(20),      
+    FiscalPeriodGAAP varchar(20)      
+    , RatingReviewStatus varchar(20),
+	 [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+        
+      
+ )      
+      
+ CREATE TABLE #Cashflowfromoperations      
+ (      
+     [filename|DataPointName] VARCHAR(200),      
+  [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+  [filename|SectionName] VARCHAR(200),      
+  FiscalYear int,      
+  KeyCurrency VARCHAR(200),      
+  DateEnded datetime,      
+  DateBegun datetime,      
+  FormOrder INT,      
+  MagnitudeMultiplier VARCHAR(200),      
+  CSDLastUpdate datetime,      
+  Exchange VARCHAR(200),      
+  ARMISRowNumber INT      
+  ,FiscalQuarter varchar(20),      
+  FiscalPeriodGAAP varchar(20)      
+  , RatingReviewStatus varchar(20),
+   [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+        
+         
+ )      
+  CREATE TABLE #Dividends      
+  (      
+         
+   [filename|DataPointName] VARCHAR(200),      
+   [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+ [filename|SectionName] VARCHAR(200),      
+      FiscalYear int,      
+   KeyCurrency VARCHAR(200),      
+   DateEnded datetime,      
+   DateBegun datetime,      
+   FormOrder INT,      
+   MagnitudeMultiplier VARCHAR(200),      
+   CSDLastUpdate datetime,      
+   Exchange VARCHAR(200),      
+   ARMISRowNumber INT      
+   ,FiscalQuarter varchar(20),      
+   FiscalPeriodGAAP varchar(20)      
+   , RatingReviewStatus varchar(20),
+    [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+         
+  )      
+      
+       
+      
+ CREATE TABLE #CapitalExpenditures       
+ (      
+   [filename|DataPointName] VARCHAR(200),      
+   [CIQ044889|DataPointvalue] NUMERIC(18,6),      
+   [filename|SectionName] VARCHAR(200),      
+   FiscalYear int,      
+   KeyCurrency VARCHAR(200),      
+   DateEnded datetime,      
+   DateBegun datetime,      
+   FormOrder INT,      
+   MagnitudeMultiplier VARCHAR(200),      
+   CSDLastUpdate datetime,      
+   Exchange VARCHAR(200),      
+   ARMISRowNumber INT      
+   ,FiscalQuarter varchar(20),      
+   FiscalPeriodGAAP varchar(20)      
+   , RatingReviewStatus varchar(20),
+    [CIQ043927|DataPointvalueForFinl] NUMERIC(19,6)
+        
+  )      
+      
+      
+select ProductCaption AS Caption,ItemName       
+INTO #LiveMetaItem      
+from ObjectViews..LiveMetaItem where keyitem between 115879 and 179843 --116187         
+      
+      
+-- Debt Table start      
+        
+	  SELECT * INTO 
+	  #dbtfinalop
+	  FROM (SELECT            
+           CIQ048401, CIQ048402,CIQ048403,CIQ048404,CIQ048405,CIQ048406,CIQ048407,CIQ048408,CIQ048409,CIQ048410,CIQ048412,          
+        CIQ048413,CIQ048414,CIQ048416,CIQ048417,CIQ048418,CIQ048419,CIQ048421,CIQ048422,CIQ048423,CIQ048424,CIQ048425,          
+        CIQ048426,CIQ048427,CIQ048428,CIQ048429,CIQ048431,CIQ048433,CIQ048434,CIQ048435,CIQ049753,CIQ049754,CIQ049755,CIQ049756,CIQ049757,CIQ049758,CIQ049759,CIQ049760,CIQ048436,          
+        CIQ049761, CIQ049762, FiscalYear,Convert(VARCHAR(100),'DEBT') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048437 as EstimatesActual,          
+        3 as ARMISRowNumber, ReportedLeaseLiabilitiesDebt,MultiEmployerPensionPlanDebt, FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus FROM #MnemonicsCollection_final          
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN (CIQ048401, CIQ048402, CIQ048403, CIQ048404, CIQ048405, CIQ048406, CIQ048407, CIQ048408,           
+         CIQ048409, CIQ048410, CIQ048412, CIQ048413, CIQ048414, CIQ048416, CIQ048417, CIQ048418, CIQ048419,           
+         CIQ048421, CIQ048422, CIQ048423, CIQ048424, CIQ048425, CIQ048426, CIQ048427,CIQ048428, CIQ048429, CIQ048431,            
+         CIQ048433, CIQ048434,CIQ048435, CIQ049753, CIQ049754, CIQ049755, CIQ049756, CIQ049757, CIQ049758, CIQ049759, CIQ049760, CIQ048436, CIQ049761, CIQ049762 , 
+		 ReportedLeaseLiabilitiesDebt,MultiEmployerPensionPlanDebt))           
+        AS sq_up       
+		
+		select * into 
+		#dbtfinl 
+		from (SELECT  FiscalYear,Convert(VARCHAR(100),'DEBT') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048437 as EstimatesActual,          
+        3 as ARMISRowNumber, IncrementalLeaseOpIncome, FiscalQuarter,FiscalPeriodGAAP , RatingReviewStatus                            
+		FROM #MnemonicsCollection_final )        
+		AS sq_source1             
+		UNPIVOT (DataPointvalue FOR DatapointName IN (IncrementalLeaseOpIncome)) AS sq_up1        
+        
+     INSERT INTO #Debt             
+    SELECT            
+     --bb.Caption as [filename|DataPointName], aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,         
+  replace(bb.Caption, 'Incremental Lease Operating Income', 'Incremental Lease Liabilities') as [filename|DataPointName],     
+   aa.[CIQ044889|DataPointvalue],    
+  aa.[filename|SectionName],    
+  FiscalYear,KeyCurrency,    
+  DateEnded,DateBegun,         
+     ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CIQ048401' THEN 1
+	 WHEN 'ReportedLeaseLiabilitiesDebt' THEN 2
+	 WHEN 'CIQ048402' THEN 3
+	 WHEN 'IncrementalLeaseOpIncome' THEN 4
+	 WHEN 'CIQ048403' THEN 5
+	 WHEN 'CIQ048404' THEN 6
+	 WHEN 'CIQ048405' THEN 7
+	 WHEN 'CIQ048406' THEN 8
+	 WHEN 'CIQ048407' THEN 9
+	 WHEN 'CIQ048408' THEN 10
+	 WHEN 'CIQ048409' THEN 11
+	 WHEN 'CIQ048410' THEN 12
+	 WHEN 'CIQ048412' THEN 13
+	 WHEN 'CIQ048413' THEN 14
+	 WHEN 'CIQ048414' THEN 15
+	 WHEN 'MultiEmployerPensionPlanDebt' THEN 16
+	 WHEN 'CIQ048416' THEN 17
+	 WHEN 'CIQ048417' THEN 18
+	 WHEN 'CIQ048418' THEN 19
+	 WHEN 'CIQ048419' THEN 20
+	 WHEN 'CIQ048421' THEN 22
+	 WHEN 'CIQ048422' THEN 23
+	 WHEN 'CIQ048423' THEN 24
+	 WHEN 'CIQ048424' THEN 25
+	 WHEN 'CIQ048425' THEN 26
+	 WHEN 'CIQ048426' THEN 27
+	 WHEN 'CIQ048427' THEN 28
+	 WHEN 'CIQ048428' THEN 29
+	 WHEN 'CIQ048429' THEN 30
+	 WHEN 'CIQ048431' THEN 32
+	 WHEN 'CIQ048433' THEN 34
+	 WHEN 'CIQ048434' THEN 35
+	 WHEN 'CIQ048435' THEN 36
+	 WHEN 'CIQ049753' THEN 37
+	 WHEN 'CIQ049754' THEN 38
+	 WHEN 'CIQ049755' THEN 39
+	 WHEN 'CIQ049756' THEN 40
+	 WHEN 'CIQ049757' THEN 41
+	 WHEN 'CIQ049758' THEN 42
+	 WHEN 'CIQ049759' THEN 43
+	 WHEN 'CIQ049760' THEN 44
+	 WHEN 'CIQ048436' THEN 45
+	 WHEN 'CIQ049761' THEN 46
+	 WHEN 'CIQ049762' THEN 47
+	 WHEN 'CIQ048438' THEN 48
+	 ELSE 49
+	 END,    
+  FiscalYear ASC) AS FormOrder,            
+     MagnitudeMultiplier,  
+  CSDLastUpdate,     
+  '' as Exchange,     
+  ARMISRowNumber ,    
+  FiscalQuarter,     
+  FiscalPeriodGAAP ,    
+  RatingReviewStatus,    
+  aa.[CIQ043927|DataPointvalueForFinl]    
+           FROM             
+    ( SELECT          
+   DataPointName [Financials Pre-Adjusted|DataPointName],          
+   DataPointvalue[CIQ044889|DataPointvalue],          
+   SectionName [filename|SectionName],          
+   FiscalYear,          
+   KeyCurrency,          
+   DateEnded,          
+   DateBegun,          
+   MagnitudeMultiplier,          
+   CSDLastUpdate,          
+   EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, null as [CIQ043927|DataPointvalueForFinl]          
+             FROM #dbtfinalop    
+   UNION ALL    
+   SELECT DataPointName [Financials Pre-Adjusted|DataPointName],          
+   null as [CIQ044889|DataPointvalue],          
+   SectionName [filename|SectionName],          
+   FiscalYear,          
+   KeyCurrency,          
+   DateEnded,          
+   DateBegun,          
+   MagnitudeMultiplier,          
+   CSDLastUpdate,          
+   EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalue [CIQ043927|DataPointvalueForFinl]          
+   FROM #dbtfinl    
+ )aa    
+ inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC            
+                 
+  UPDATE #Debt Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048437')          
+          
+          
+  INSERT INTO #Debt          
+    SELECT          
+      null as [filename|DataPointName],          
+      aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+      ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+      MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus,aa.[CIQ043927|DataPointvalueForFinl]        
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],DataPointvalue [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate,  ARMISRowNumber , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus,null as [CIQ043927|DataPointvalueForFinl]              
+            FROM          
+      (SELECT            
+           CIQ048438,          
+        FiscalYear,Convert(VARCHAR(100),'DEBT') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,          
+        4 as ARMISRowNumber , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (DatapointValue FOR DatapointName IN ( CIQ048438))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+               
+          
+  INSERT INTO #Debt           
+    SELECT          
+       null as [filename|DataPointName],          
+    aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus,aa.[CIQ043927|DataPointvalueForFinl]          
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],DataPointvalue [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus,null as [CIQ043927|DataPointvalueForFinl]          
+            FROM          
+      (SELECT            
+           CIQ048437,          
+        FiscalYear,Convert(VARCHAR(100),'DEBT') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048437 as EstimatesActual, 2 as ARMISRowNumber          
+        , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048437))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+   UPDATE #Debt Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048437') where Exchange = ''          
+          
+  INSERT INTO #Debt           
+    SELECT          
+       null as [filename|DataPointName],          
+      aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+      ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+      MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus,aa.[CIQ043927|DataPointvalueForFinl]          
+       FROM           
+    (SELECT          
+      DataPointName [Financials Pre-Adjusted|DataPointName],DataPointvalue [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+      KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate,  ARMISRowNumber , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus,null as [CIQ043927|DataPointvalueForFinl]              
+            FROM          
+      (SELECT            
+           CIQ048400,          
+        FiscalYear,Convert(VARCHAR(100),'DEBT') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, 1 as ARMISRowNumber          
+        , FiscalQuarter  ,FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048400))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+  
+--select * from #Debt          
+      
+  -- Debt Table end      
+             
+        
+  -- Shareholder Table start      
+                  
+   INSERT INTO #ShareholderEquity           
+    SELECT            
+     bb.Caption as [filename|DataPointName], aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate,'' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,aa.[CIQ043927|DataPointvalueForFinl]          
+           FROM           
+   (SELECT   
+     DataPointName [Financials Pre-Adjusted|DataPointName],DataPointvalue [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  null as [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+    (SELECT            
+        CIQ048440,CIQ048441,CIQ048442,CIQ048443,CIQ048445,CIQ048446,CIQ048447,CIQ048448,CIQ048449,CIQ048451,          
+        FiscalYear,Convert(VARCHAR(100),'EQUITY') AS SectionName,DateEnded,DateBegun,KeyCurrency,          
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048452 as EstimatesActual, 3 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+                      
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN (CIQ048440, CIQ048441, CIQ048442, CIQ048443, CIQ048445,          
+         CIQ048446, CIQ048447, CIQ048448, CIQ048449, CIQ048451))           
+      AS sq_up          
+    )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+           
+  UPDATE #ShareholderEquity Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048452')          
+            
+  INSERT INTO #ShareholderEquity           
+    SELECT          
+     null as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]  
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],DataPointvalue [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  null as [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048453,          
+        FiscalYear,Convert(VARCHAR(100),'EQUITY') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,4 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048453))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+  INSERT INTO #ShareholderEquity           
+    SELECT          
+       null as [filename|DataPointName],          
+ aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,aa.[CIQ043927|DataPointvalueForFinl]          
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],DataPointvalue [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  null as [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048452,          
+        FiscalYear,Convert(VARCHAR(100),'EQUITY') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048452 as EstimatesActual, 2 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048452))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+   UPDATE #ShareholderEquity Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048452') where Exchange = ''          
+          
+  INSERT INTO #ShareholderEquity           
+    SELECT          
+    null as [filename|DataPointName],          
+      aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+      ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+      MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+   aa.[CIQ043927|DataPointvalueForFinl]  
+       FROM           
+    (SELECT          
+      DataPointName [Financials Pre-Adjusted|DataPointName],DataPointvalue [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+      KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate,  ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+   null as [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048439,          
+        FiscalYear,Convert(VARCHAR(100),'EQUITY') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,1 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048439))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+   --select * from #ShareholderEquity      
+        
+  -- Shareholder Table end      
+       
+      
+ -- Revenues Table start      
+        
+      INSERT INTO #Revenues           
+    SELECT            
+     bb.Caption as [filename|DataPointName], aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]          
+            FROM           
+   (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+                  
+                  
+        CIQ048455,          
+        CIQ048456,          
+        CIQ048457,          
+        CIQ048458,          
+        CIQ048459,          
+		CIQ048460,          
+        CIQ048461,  
+		CIQ049763,
+		CIQ049764,
+		CIQ049765,
+		CIQ049766,
+		CIQ049767,
+		CIQ049768,
+        FiscalYear,Convert(VARCHAR(100),'REVENUES') AS SectionName,DateEnded,DateBegun,KeyCurrency,          
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048462 as EstimatesActual, 3 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+                
+       )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048455, CIQ048456, CIQ048457, CIQ048458, CIQ048459,           
+                 CIQ048460, CIQ048461, CIQ049763, CIQ049764, CIQ049765, CIQ049766, CIQ049767, CIQ049768          
+                 ))           
+      AS sq_up          
+        )aa           
+                
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+            
+          
+   UPDATE #Revenues Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048462')          
+          
+  INSERT INTO #Revenues           
+    SELECT            
+     null as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,aa.[CIQ043927|DataPointvalueForFinl]          
+            FROM           
+   (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as  [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+                  
+        CIQ048463,          
+        FiscalYear,Convert(VARCHAR(100),'REVENUES') AS SectionName,DateEnded,DateBegun,KeyCurrency,          
+        MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+                
+       )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN (  CIQ048463))           
+      AS sq_up          
+        )aa           
+                
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+  INSERT INTO #Revenues           
+    SELECT          
+       null as [filename|DataPointName],          
+    aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+ aa.[CIQ043927|DataPointvalueForFinl]   
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as  [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]   
+            FROM          
+      (SELECT            
+           CIQ048462,          
+        FiscalYear,Convert(VARCHAR(100),'REVENUES') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048462 as EstimatesActual, 2 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048462))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+   UPDATE #Revenues Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048462') where Exchange = ''          
+          
+          
+   INSERT INTO #Revenues           
+    SELECT          
+     null as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]  
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048454,          
+        FiscalYear,Convert(VARCHAR(100),'REVENUES') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,1 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048454))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+  --select * from #Revenues      
+      
+  -- Revenues Table end      
+      
+      
+  --EBITDA Table start      
+        
+   INSERT INTO #EBITDA           
+   SELECT            
+     bb.Caption as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],          
+     aa.[filename|SectionName],          
+     FiscalYear,          
+     KeyCurrency,          
+     DateEnded,          
+     DateBegun,          
+     --ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,
+	 ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CIQ048466' THEN 1
+	 WHEN 'IncrementalLeaseEarning' THEN 2
+	 WHEN 'CIQ048467' THEN 3
+	 WHEN 'CIQ048468' THEN 4
+	 WHEN 'CIQ048469' THEN 5
+	 WHEN 'CIQ048473' THEN 6
+	 WHEN 'CIQ048474' THEN 7
+	 WHEN 'CIQ048475' THEN 8
+	 WHEN 'CIQ048476' THEN 9
+	 WHEN 'CIQ048477' THEN 10
+	 WHEN 'CIQ048478' THEN 11
+	 WHEN 'IncomeUnconsolidatedCompany' THEN 12
+	 WHEN 'CIQ048479' THEN 13
+	 WHEN 'CIQ048480' THEN 14
+	 WHEN 'CIQ048481' THEN 15
+	 WHEN 'CIQ048482' THEN 16
+	 WHEN 'CIQ049769' THEN 17
+	 WHEN 'CIQ049770' THEN 18
+	 WHEN 'CIQ049771' THEN 19
+	 WHEN 'CIQ049772' THEN 20
+	 WHEN 'CIQ049773' THEN 21
+	 WHEN 'CIQ048471' THEN 22
+	 WHEN 'CIQ048472' THEN 23
+	 WHEN 'CIQ049774' THEN 24
+	 WHEN 'CIQ048486' THEN 25
+	 WHEN 'CIQ049775' THEN 26
+	 WHEN 'CIQ049776' THEN 27
+	 WHEN 'CIQ049777' THEN 28
+	 WHEN 'CIQ049778' THEN 29
+	 WHEN 'CIQ048500' THEN 30
+	 WHEN 'CIQ048501' THEN 31
+	 WHEN 'CIQ048502' THEN 32
+	 WHEN 'CIQ048503' THEN 33
+	 WHEN 'CIQ048504' THEN 34
+	 WHEN 'CIQ048505' THEN 35
+	 WHEN 'CIQ048506' THEN 36
+	 WHEN 'CIQ048507' THEN 37
+	 WHEN 'CIQ048508' THEN 38
+	 WHEN 'CIQ048509' THEN 39
+	 WHEN 'CIQ048510' THEN 40
+	 WHEN 'CIQ048511' THEN 41
+	 WHEN 'CIQ049779' THEN 42
+	 WHEN 'CIQ049780' THEN 43
+	 WHEN 'CIQ049781' THEN 44
+	 WHEN 'CIQ049782' THEN 45
+	 WHEN 'CIQ049783' THEN 46
+	 WHEN 'CIQ049784' THEN 47
+	 WHEN 'CIQ049785' THEN 48
+	 WHEN 'CIQ049787' THEN 49
+	 WHEN 'CIQ049789' THEN 50
+	 WHEN 'CIQ049790' THEN 51
+	 WHEN 'CIQ050045' THEN 52
+	 WHEN 'CIQ049791' THEN 53
+	 WHEN 'CIQ049792' THEN 54
+	 WHEN 'CIQ049793' THEN 55
+	 WHEN 'CIQ048513' THEN 56
+	 ELSE 57
+	 END, 
+	 FiscalYear ASC) AS FormOrder,
+     MagnitudeMultiplier,          
+     CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]   
+     FROM           
+   (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],          
+     null as [CIQ044889|DataPointvalue],          
+     SectionName [filename|SectionName],          
+     FiscalYear,          
+     KeyCurrency,          
+       DateEnded,          
+       DateBegun,          
+       MagnitudeMultiplier,          
+       CSDLastUpdate, EstimatesActual, ARMISRowNumber          
+       , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+    DatapointValue [CIQ043927|DataPointvalueForFinl]   
+     FROM          
+      (SELECT            
+              
+        CIQ048466,          
+        CIQ048467,          
+        CIQ048468,          
+        CIQ048469,          
+        CIQ048471,   
+        CIQ048472,          
+        CIQ048473,          
+        CIQ048474,          
+        CIQ048475,          
+        CIQ048476,          
+        CIQ048477,          
+		CIQ048478,          
+        CIQ048479,          
+        CIQ048480,          
+        CIQ048481,          
+        CIQ048482,         
+        CIQ048486,          
+        CIQ048500,          
+        CIQ048501,          
+        CIQ048502,          
+        CIQ048503,          
+        CIQ048504,          
+        CIQ048505,          
+        CIQ048506,          
+        CIQ048507,          
+        CIQ048508,          
+        CIQ048509,          
+        CIQ048510,          
+        CIQ048511, 
+		CIQ049769,
+		CIQ049770,
+		CIQ049771,
+		CIQ049772,
+		CIQ049773,
+		CIQ049774,
+		CIQ049775,
+		CIQ049776,
+		CIQ049777,
+		CIQ049778,
+		CIQ049779,
+		CIQ049780,
+		CIQ049781,
+		CIQ049782,
+		CIQ049783,
+		CIQ049784,
+		CIQ049785,
+		CIQ049787,
+		CIQ049789,
+		CIQ049790,
+		CIQ050045,
+		CIQ049791,
+		CIQ049792,
+		CIQ049793,
+             FiscalYear,Convert(VARCHAR(100),'EBITDA') AS SectionName,DateEnded,DateBegun,KeyCurrency,          
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048512 as EstimatesActual, 3 as ARMISRowNumber,  FiscalQuarter, FiscalPeriodGAAP ,  RatingReviewStatus ,          
+        IncrementalLeaseEarning, IncomeUnconsolidatedCompany          
+        FROM #MnemonicsCollection_final          
+                
+       )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN (           
+                 CIQ048466, CIQ048467, CIQ048468, CIQ048469, CIQ048471,          
+                 CIQ048472, CIQ048473, CIQ048474, CIQ048475, CIQ048476, CIQ048477, CIQ048478, CIQ048479,          
+                 CIQ048480, CIQ048481, CIQ048482, CIQ048486, CIQ048500, CIQ048501, CIQ048502, CIQ048503,          
+                 CIQ048504, CIQ048505, CIQ048506, CIQ048507, CIQ048508, CIQ048509, CIQ048510, CIQ048511,
+				 CIQ049769, CIQ049770, CIQ049771, CIQ049772, CIQ049773, CIQ049774, CIQ049775, CIQ049776,
+				 CIQ049777, CIQ049778, CIQ049779, CIQ049780, CIQ049781, CIQ049782, CIQ049783, CIQ049784,
+				 CIQ049785, CIQ049787, CIQ049789, CIQ049790, CIQ050045, CIQ049791, CIQ049792, CIQ049793,
+                 IncrementalLeaseEarning, IncomeUnconsolidatedCompany          
+                 ))           
+      AS sq_up          
+        )aa           
+                
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+          
+  UPDATE #EBITDA Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048512')          
+          
+  INSERT INTO #EBITDA           
+    SELECT            
+     null as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]  
+            FROM           
+   (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+                  
+        CIQ048513,          
+        FiscalYear,Convert(VARCHAR(100),'EBITDA') AS SectionName,DateEnded,DateBegun,KeyCurrency,          
+        MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+                
+       )           
+       AS sq_source      
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048513))           
+      AS sq_up          
+        )aa           
+                
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+  INSERT INTO #EBITDA           
+    SELECT          
+       null as [filename|DataPointName],          
+    aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+ aa.[CIQ043927|DataPointvalueForFinl]  
+           FROM           
+    (SELECT          
+ DataPointName [Financials Pre-Adjusted|DataPointName],null as  [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048512,          
+        FiscalYear,Convert(VARCHAR(100),'EBITDA') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048512 as EstimatesActual, 2 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048512))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+   UPDATE #EBITDA Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048512') where Exchange = ''          
+          
+  INSERT INTO #EBITDA           
+    SELECT          
+     null as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]  
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as  [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048464,          
+        FiscalYear,Convert(VARCHAR(100),'EBITDA') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,1 as ARMISRowNumber           
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (   
+          DatapointValue FOR DatapointName IN ( CIQ048464))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+      
+        
+      
+  --EBITDA Table end      
+      
+  --select * from #EBITDA      
+      
+  --Operating Income start      
+        
+          INSERT INTO #OperatingIncome           
+    select            
+     --bb.Caption as [filename|DataPointName],       
+  replace(bb.Caption, 'FFO From Incremental Leases' , 'Incremental Lease Operating Income' ) as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],          
+     aa.[filename|SectionName],          
+     FiscalYear,          
+     KeyCurrency,          
+     DateEnded,          
+     DateBegun,          
+     ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CIQ048516' THEN 1
+	 WHEN 'IncremLeaseFundOperation' THEN 2
+	 WHEN 'CIQ048517' THEN 3
+	 WHEN 'CIQ048518' THEN 4
+	 WHEN 'CIQ048519' THEN 5
+	 WHEN 'CIQ048521' THEN 6
+	 WHEN 'CIQ048522' THEN 7
+	 WHEN 'CIQ048523' THEN 8
+	 WHEN 'CIQ048524' THEN 9
+	 WHEN 'CIQ048525' THEN 10
+	 WHEN 'CIQ048526' THEN 11
+	 WHEN 'CIQ048527' THEN 12
+	 WHEN 'CIQ048528' THEN 13
+	 WHEN 'CIQ048529' THEN 14
+	 WHEN 'CIQ048530' THEN 15
+	 WHEN 'CIQ049794' THEN 16
+	 WHEN 'CIQ049795' THEN 17
+	 WHEN 'CIQ049796' THEN 18
+	 WHEN 'CIQ049797' THEN 19
+	 WHEN 'CIQ049798' THEN 20
+	 WHEN 'CIQ049799' THEN 21
+	 WHEN 'CIQ048534' THEN 22
+	 WHEN 'CIQ049800' THEN 23
+	 WHEN 'CIQ049801' THEN 24
+	 WHEN 'CIQ049802' THEN 25
+	 WHEN 'CIQ049803' THEN 26
+	 WHEN 'CIQ048548' THEN 27
+	 WHEN 'CIQ048549' THEN 28
+	 WHEN 'CIQ048550' THEN 29
+	 WHEN 'CIQ048551' THEN 30
+	 WHEN 'CIQ048552' THEN 31
+	 WHEN 'CIQ048553' THEN 32
+	 WHEN 'CIQ048554' THEN 33
+	 WHEN 'CIQ048555' THEN 34
+	 WHEN 'CIQ048556' THEN 35
+	 WHEN 'CIQ048557' THEN 36
+	 WHEN 'CIQ048558' THEN 37
+	 WHEN 'CIQ048559' THEN 38
+	 WHEN 'CIQ049804' THEN 39
+	 WHEN 'CIQ049805' THEN 40
+	 WHEN 'CIQ049806' THEN 41
+	 WHEN 'CIQ049807' THEN 42
+	 WHEN 'CIQ049808' THEN 43
+	 WHEN 'CIQ049809' THEN 44
+	 WHEN 'CIQ049810' THEN 45
+	 WHEN 'CIQ049812' THEN 46
+	 WHEN 'CIQ049814' THEN 47
+	 WHEN 'CIQ050046' THEN 48
+	 WHEN 'CIQ049815' THEN 49
+	 WHEN 'CIQ049816' THEN 50
+	 WHEN 'CIQ048560' THEN 51
+	 WHEN 'CIQ048561' THEN 52
+	 WHEN 'CIQ048562' THEN 53
+	 WHEN 'CIQ049817' THEN 54
+	 WHEN 'CIQ048563' THEN 55
+	 WHEN 'CIQ048564' THEN 56
+	 WHEN 'CIQ048566' THEN 57
+	 WHEN 'CIQ049819' THEN 58
+	 WHEN 'CIQ050047' THEN 59
+	 WHEN 'CIQ048568' THEN 60
+	 ELSE 61
+	 END, 
+	 FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,          
+     CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]  
+            FROM          
+   (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],          
+     null as [CIQ044889|DataPointvalue],          
+     SectionName [filename|SectionName],          
+     FiscalYear,          
+     KeyCurrency,          
+       DateEnded,          
+       DateBegun,          
+       MagnitudeMultiplier,          
+       CSDLastUpdate,          
+       EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+    DatapointValue [CIQ043927|DataPointvalueForFinl]  
+     FROM          
+      (          
+          
+        SELECT            
+                  
+        CIQ048516,          
+        CIQ048517,          
+        CIQ048518,          
+        CIQ048519,          
+        CIQ048521,          
+        CIQ048522,          
+        CIQ048523,          
+        CIQ048524,          
+        CIQ048525,          
+        CIQ048526,          
+        CIQ048527,          
+        CIQ048528,          
+        CIQ048529,          
+        CIQ048530,          
+        CIQ048534,          
+        CIQ048548,          
+        CIQ048549,          
+        CIQ048550,          
+        CIQ048551,          
+        CIQ048552,          
+        CIQ048553,          
+        CIQ048554,          
+        CIQ048555,          
+        CIQ048556,          
+        CIQ048557,          
+        CIQ048558,          
+        CIQ048559,          
+        CIQ048560,          
+        CIQ048561,          
+        CIQ048562,          
+        CIQ048563,          
+        CIQ048564,          
+        CIQ048566,
+		CIQ049794,
+		CIQ049795,
+		CIQ049796,
+		CIQ049797,
+		CIQ049798,
+		CIQ049799,
+		CIQ049800,
+		CIQ049801,
+		CIQ049802,
+		CIQ049803,
+		CIQ049804,
+		CIQ049805,
+		CIQ049806,
+		CIQ049807,
+		CIQ049808,
+		CIQ049809,
+		CIQ049810,
+		CIQ049812,
+		CIQ049814,
+		CIQ050046,
+		CIQ049815,
+		CIQ049816,
+		CIQ049817,
+		CIQ049819,
+		CIQ050047,
+            FiscalYear,Convert(VARCHAR(100),'EBIT') AS SectionName,DateEnded,DateBegun,KeyCurrency,          
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048567 as EstimatesActual, 3 as ARMISRowNumber,  FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus ,          
+        IncremLeaseFundOperation            
+        FROM #MnemonicsCollection_final          
+                  
+                
+       )     
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN (          
+                 CIQ048516, CIQ048517, CIQ048518, CIQ048519, CIQ048521, CIQ048522, CIQ048523,          
+                 CIQ048524, CIQ048525, CIQ048526, CIQ048527, CIQ048528, CIQ048529, CIQ048530,          
+                 CIQ048534, CIQ048548, CIQ048549, CIQ048550, CIQ048551, CIQ048552, CIQ048553,          
+                 CIQ048554, CIQ048555, CIQ048556, CIQ048557, CIQ048558, CIQ048559, CIQ048560,         
+                 CIQ048561, CIQ048562, CIQ048563, CIQ049794, CIQ049795, CIQ049796, CIQ049797, 
+				 CIQ049798, CIQ049799, CIQ049800, CIQ049801, CIQ049802, CIQ049803, CIQ049804, 
+				 CIQ049805, CIQ049806, CIQ049807, CIQ049808, CIQ049809, CIQ049810, CIQ049812, 
+				 CIQ049814, CIQ050046, CIQ049815, CIQ049816, CIQ049817, CIQ049819, CIQ050047,         
+                 CIQ048564, CIQ048566, IncremLeaseFundOperation          
+                 ))           
+               AS sq_up          
+                 )aa           
+                
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+  UPDATE #OperatingIncome Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048567')          
+          
+  INSERT INTO #OperatingIncome           
+    SELECT            
+     null as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP  , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]  
+            FROM           
+   (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP  , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048568,          
+        FiscalYear,Convert(VARCHAR(100),'EBIT') AS SectionName,DateEnded,DateBegun,KeyCurrency,          
+        MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP  , RatingReviewStatus          
+        FROM #MnemonicsCollection_final          
+                
+       )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048568))           
+      AS sq_up          
+        )aa           
+                
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+                  
+  INSERT INTO #OperatingIncome           
+    SELECT          
+       null as [filename|DataPointName],          
+    aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP  , RatingReviewStatus,  
+ aa.[CIQ043927|DataPointvalueForFinl]  
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP  , RatingReviewStatus,  
+  DataPointvalue [CIQ043927|DataPointvalueForFinl]  
+         FROM          
+   (SELECT            
+           CIQ048567,          
+        FiscalYear,Convert(VARCHAR(100),'EBIT') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048567 as EstimatesActual, 2 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048567))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+          
+   UPDATE #OperatingIncome Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048567') where Exchange = ''          
+          
+          
+  INSERT INTO #OperatingIncome           
+    SELECT          
+     null as [filename|DataPointName],          
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,          
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,          
+     MagnitudeMultiplier,CSDLastUpdate,  bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  aa.[CIQ043927|DataPointvalueForFinl]  
+           FROM           
+    (SELECT          
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,          
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  
+  DatapointValue [CIQ043927|DataPointvalueForFinl]  
+            FROM          
+      (SELECT            
+           CIQ048514,          
+        FiscalYear,Convert(VARCHAR(100),'EBIT') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,1 as ARMISRowNumber          
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus          
+        FROM #MnemonicsCollection_final           
+      )           
+       AS sq_source          
+       UNPIVOT (          
+         DatapointValue FOR DatapointName IN ( CIQ048514))           
+        AS sq_up          
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC          
+      
+   --select * from #OperatingIncome      
+        
+  --Operating Income end       
+      
+  --Interest Expense start      
+        
+  INSERT INTO #InterestExpense       
+    SELECT        
+     bb.Caption as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],      
+     aa.[filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+     DateEnded,      
+     DateBegun,      
+     ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CIQ048571' THEN 1
+	 WHEN 'IncrementalLeaseInterestExp' THEN 2
+	 WHEN 'CIQ048572' THEN 3
+	 WHEN 'CIQ048573' THEN 4
+	 WHEN 'CIQ048574' THEN 5
+	 WHEN 'CIQ048575' THEN 6
+	 WHEN 'CIQ048576' THEN 7
+	 WHEN 'CIQ048577' THEN 8
+	 WHEN 'CIQ048578' THEN 9
+	 WHEN 'CIQ048579' THEN 10
+	 WHEN 'CIQ048581' THEN 11
+	 WHEN 'CIQ048582' THEN 12
+	 WHEN 'CIQ048583' THEN 13
+	 WHEN 'CIQ049820' THEN 14
+	 WHEN 'CIQ048584' THEN 15
+	 WHEN 'CIQ048585' THEN 16
+	 WHEN 'CIQ048586' THEN 17
+	 WHEN 'CIQ048587' THEN 18
+	 WHEN 'CIQ048588' THEN 19
+	 WHEN 'CIQ049821' THEN 20
+	 WHEN 'CIQ049821' THEN 21
+	 WHEN 'CIQ049822' THEN 22
+	 WHEN 'CIQ049823' THEN 23
+	 WHEN 'CIQ048590' THEN 24
+	 ELSE 25
+	 END, 
+	 FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,      
+     CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  aa.[CIQ043927|DataPointvalueForFinl]      
+        FROM       
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],      
+     null as [CIQ044889|DataPointvalue],      
+     SectionName [filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+       DateEnded,      
+       DateBegun,      
+       MagnitudeMultiplier,      
+       CSDLastUpdate,      
+       EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP  , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+        FROM      
+      (SELECT        
+
+        CIQ048571,      
+        CIQ048572,      
+        CIQ048573,      
+        CIQ048574,      
+        CIQ048575,      
+        CIQ048576,      
+        CIQ048577,      
+        CIQ048578,      
+        CIQ048579,      
+        CIQ048581,      
+        CIQ048582,      
+        CIQ048583,      
+        CIQ048584,      
+        CIQ048585,      
+        CIQ048586,      
+        CIQ048587,      
+        CIQ048588,  
+		CIQ049820,
+		CIQ049821,
+		CIQ049822,
+		CIQ049823,
+        FiscalYear,Convert(VARCHAR(100),'INTEREST EXPENSE') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048589 as EstimatesActual, 3 as ARMISRowNumber,  FiscalQuarter, FiscalPeriodGAAP ,  RatingReviewStatus ,      
+        IncrementalLeaseInterestExp       
+        FROM #MnemonicsCollection_final      
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048571, CIQ048572, CIQ048573, CIQ048574, CIQ048575,      
+                 CIQ048576, CIQ048577, CIQ048578, CIQ048579, CIQ048581, CIQ048582,      
+                 CIQ048583, CIQ048584, CIQ048585, CIQ048586, CIQ048587, CIQ048588, CIQ049820, CIQ049821, CIQ049822, CIQ049823,     
+                 IncrementalLeaseInterestExp       
+                 ))       
+      AS sq_up      
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+  UPDATE #InterestExpense Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048589')      
+      
+  INSERT INTO #InterestExpense       
+    SELECT        
+     null as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate,  bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+            FROM       
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+            FROM      
+      (SELECT        
+              
+        CIQ048590,      
+        FiscalYear,Convert(VARCHAR(100),'INTEREST EXPENSE') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final      
+            
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN (CIQ048590))       
+      AS sq_up      
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+  INSERT INTO #InterestExpense       
+    SELECT      
+       null as [filename|DataPointName],      
+    aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]     
+            FROM      
+      (SELECT        
+           CIQ048589,      
+        FiscalYear,Convert(VARCHAR(100),'INTEREST EXPENSE') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048589 as EstimatesActual, 2 as ARMISRowNumber      
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final       
+      )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048589))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+   UPDATE #InterestExpense Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048589') where Exchange = ''      
+      
+  INSERT INTO #InterestExpense       
+    SELECT      
+     null as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+            FROM      
+      (SELECT        
+           CIQ048569,      
+        FiscalYear,Convert(VARCHAR(100),'INTEREST EXPENSE') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, 1 as  ARMISRowNumber      
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final       
+      )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048569))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+      
+   --Interest expense end      
+   --select * from #InterestExpense      
+      
+   --EBITDAOFF start      
+         
+  INSERT INTO #EBITDAFFO       
+     SELECT        
+      null as [filename|DataPointName],      
+      aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+      ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+      MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  aa.[CIQ043927|DataPointvalueForFinl]      
+       FROM       
+    (SELECT      
+      DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+      KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate,  ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+       FROM      
+       (SELECT        
+         CIQ048591,      
+         FiscalYear,Convert(VARCHAR(100),'Funds From Operations (FFO)') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+         MagnitudeMultiplier,CSDLastUpdate, 1 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+         FROM #MnemonicsCollection_final      
+            
+        )       
+        AS sq_source      
+        UNPIVOT (      
+          DataPointvalueForFinl FOR DatapointName IN ( CIQ048591))       
+       AS sq_up      
+         )aa       
+            
+         inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+          
+   INSERT INTO #EBITDAFFO       
+     SELECT      
+      null as [filename|DataPointName],      
+      null as [CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+      ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+      MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP 
+	  , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+      FROM       
+     (SELECT      
+      DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+      KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,
+	  CSDLastUpdate, EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, EstimatesActual as [CIQ043927|DataPointvalueForFinl]      
+             FROM      
+       (SELECT        
+         CIQ048596,      
+         FiscalYear,Convert(VARCHAR(100),'Funds From Operations (FFO)') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,CIQ048653 as EstimatesActual, 2 as ARMISRowNumber      
+         , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+         FROM #MnemonicsCollection_final       
+       )       
+        AS sq_source      
+        UNPIVOT (      
+          DataPointvalueForFinl FOR DatapointName IN (CIQ048596))       
+         AS sq_up      
+      )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+   UPDATE #EBITDAFFO Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048653') where Exchange = ''      
+   
+   
+  select * into #temp from (SELECT        
+        CIQ048596,CIQ048597,CIQ048598,CIQ048599,CIQ048600,CIQ048602,CIQ048607,      
+        CIQ048608,CIQ048610,CIQ048611,CIQ048613,CIQ048652,CIQ050048, CIQ049825, CIQ049826, CIQ049827, CIQ049828, CIQ049824, CIQ049829, CIQ049830,
+		FiscalYear,Convert(VARCHAR(100),'Funds From Operations (FFO)') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048653 as EstimatesActual, 3 as ARMISRowNumber,  FiscalQuarter, FiscalPeriodGAAP ,  RatingReviewStatus ,      
+        CashTaxesPaidEarning,CashTaxesPaidOtherEarning,CashInterestPaid,      
+        CashInterestPaidOther,LeaseLiabAdjToDebt      
+        FROM #MnemonicsCollection_final      
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN (      
+        CIQ048596,CIQ048597,CIQ048598,CIQ048599,CIQ048600,CIQ048602,CIQ048607,CIQ048608,CIQ048610,CIQ048611,CIQ048613,CIQ048652,CIQ050048, CIQ049825, CIQ049826, CIQ049827, CIQ049828, CIQ049824, CIQ049829, CIQ049830,      
+        CashTaxesPaidEarning,CashTaxesPaidOtherEarning,CashInterestPaid,CashInterestPaidOther  --- finop    
+                 )) as s
+
+ select * into #temp1 from (SELECT        
+        LeaseLiabAdjToDebt,FiscalYear,Convert(VARCHAR(100),'Funds From Operations (FFO)') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048653 as EstimatesActual, 3 as ARMISRowNumber,
+		FiscalQuarter, FiscalPeriodGAAP ,  RatingReviewStatus                   
+        FROM #MnemonicsCollection_final      
+       )       
+    AS sq_source1      
+       UNPIVOT (      
+         DataPointvalue FOR DatapointName IN (LeaseLiabAdjToDebt))       
+      AS sq_up1
+         
+  INSERT INTO #EBITDAFFO      
+    SELECT        
+     --bb.Caption as [filename|DataPointName],    
+  replace(bb.Caption,'Incremental Lease Liabilities' , 'FFO From Incremental Leases')  as [filename|DataPointName],   
+     aa.[CIQ044889|DataPointvalue],      
+     aa.[filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+     DateEnded,      
+     DateBegun,      
+     ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CashTaxesPaidEarning' THEN 1
+	 WHEN 'CashTaxesPaidOtherEarning' THEN 2
+	 WHEN 'CashInterestPaid' THEN 3
+	 WHEN 'CashInterestPaidOther' THEN 4
+	 WHEN 'CIQ050048' THEN 5
+	 WHEN 'CIQ048596' THEN 6
+	 WHEN 'LeaseLiabAdjToDebt' THEN 7
+	 WHEN 'CIQ048597' THEN 8
+	 WHEN 'CIQ048598' THEN 9
+	 WHEN 'CIQ048599' THEN 10
+	 WHEN 'CIQ048600' THEN 11
+	 WHEN 'CIQ048602' THEN 12
+	 WHEN 'CIQ048607' THEN 13
+	 WHEN 'CIQ048608' THEN 14
+	 WHEN 'CIQ048610' THEN 15
+	 WHEN 'CIQ048611' THEN 16
+	 WHEN 'CIQ048613' THEN 17
+	 WHEN 'CIQ049825' THEN 18
+	 WHEN 'CIQ049826' THEN 19
+	 WHEN 'CIQ048652' THEN 20
+	 WHEN 'CIQ049827' THEN 21
+	 WHEN 'CIQ049828' THEN 22
+	 WHEN 'CIQ049824' THEN 23
+	 WHEN 'CIQ049829' THEN 24
+	 WHEN 'CIQ049830' THEN 25
+	 ELSE 26
+	 END,
+	 FiscalYear ASC) AS FormOrder,
+     MagnitudeMultiplier,      
+     CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+      FROM       
+		( SELECT      
+			DataPointName [Financials Pre-Adjusted|DataPointName],      
+			null as [CIQ044889|DataPointvalue],      
+			SectionName [filename|SectionName],      
+			FiscalYear,      
+			KeyCurrency,      
+			DateEnded,      
+			DateBegun,      
+			MagnitudeMultiplier,      
+			CSDLastUpdate,      
+			EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+             FROM #temp
+	    UNION ALL
+			SELECT DataPointName [Financials Pre-Adjusted|DataPointName],      
+			DataPointvalue as [CIQ044889|DataPointvalue],      
+			SectionName [filename|SectionName],      
+			FiscalYear,      
+			KeyCurrency,      
+			DateEnded,      
+			DateBegun,      
+			MagnitudeMultiplier,      
+			CSDLastUpdate,      
+			EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, null as [CIQ043927|DataPointvalueForFinl]      
+			FROM #temp1
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+      
+           UPDATE #EBITDAFFO Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048653')      
+      
+      
+     INSERT INTO #EBITDAFFO       
+     SELECT        
+      null as [filename|DataPointName],      
+      aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+      ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+      MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+       FROM       
+    (SELECT      
+      DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+      KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate,  ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+       FROM      
+       (SELECT        
+         CIQ048654,      
+         FiscalYear,Convert(VARCHAR(100),'Funds From Operations (FFO)') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+         MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+    FROM #MnemonicsCollection_final      
+            
+        )       
+        AS sq_source      
+        UNPIVOT (      
+          DataPointvalueForFinl FOR DatapointName IN ( CIQ048654))       
+       AS sq_up      
+         )aa       
+            
+         inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+         
+    UPDATE #EBITDAFFO Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048591') where ARMISRowNumber = 1      
+      
+ --select * from #EBITDAFFO      
+   --EBITDAOFF end      
+         
+       
+  --CashFlow start      
+        
+     INSERT INTO #Cashflowfromoperations       
+    SELECT        
+     bb.Caption as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],      
+     aa.[filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+     DateEnded,      
+     DateBegun,      
+     ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CIQ048656' THEN 1
+     WHEN 'CIQ048657' THEN 2
+     WHEN 'IncrementalLeaseCashFlowOper' THEN 3
+     WHEN 'CIQ048658' THEN 4
+     WHEN 'CIQ048659' THEN 5
+     WHEN 'CIQ048660' THEN 6
+     WHEN 'CIQ048661' THEN 7
+     WHEN 'CIQ048663' THEN 8
+     WHEN 'CIQ048664' THEN 9
+     WHEN 'CIQ048666' THEN 10
+     WHEN 'CIQ048667' THEN 11
+     WHEN 'CIQ048668' THEN 12
+	 WHEN 'CIQ048669' THEN 13
+	 WHEN 'CIQ048671' THEN 14
+	 WHEN 'CIQ048672' THEN 15
+	 WHEN 'CIQ048673' THEN 16
+	 WHEN 'CIQ049831' THEN 17
+	 WHEN 'CIQ049832' THEN 18
+	 WHEN 'CIQ049833' THEN 19
+	 WHEN 'CIQ049839' THEN 20
+	 WHEN 'CIQ049834' THEN 21
+	 WHEN 'CIQ048675' THEN 22
+	 WHEN 'CIQ048676' THEN 23
+	 WHEN 'CIQ048677' THEN 24
+	 WHEN 'CIQ048679' THEN 25
+	 WHEN 'CIQ048680' THEN 26
+	 WHEN 'CIQ048681' THEN 27
+	 WHEN 'CIQ048682' THEN 28
+	 WHEN 'CIQ048683' THEN 29
+	 WHEN 'CIQ048684' THEN 30
+	 WHEN 'CIQ048685' THEN 31
+	 WHEN 'CIQ049835' THEN 32
+	 WHEN 'CIQ049836' THEN 33
+	 WHEN 'CIQ049837' THEN 34
+	 WHEN 'CIQ049838' THEN 35
+	 WHEN 'CIQ049841' THEN 36
+	 WHEN 'CIQ049842' THEN 37
+	 WHEN 'CIQ049843' THEN 38
+	 ELSE 39
+	 END,
+	 FiscalYear ASC) AS FormOrder,
+     MagnitudeMultiplier,      
+     CSDLastUpdate, '' as Exchange, ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+     FROM       
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],      
+     null as [CIQ044889|DataPointvalue],      
+     SectionName [filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+     DateEnded,      
+     DateBegun,      
+     MagnitudeMultiplier,      
+     CSDLastUpdate,      
+     EstimatesActual,ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]   
+          FROM      
+      (      
+      
+        SELECT       
+        CIQ048656,      
+        CIQ048657,      
+        CIQ048658,      
+        CIQ048659,      
+        CIQ048660,      
+        CIQ048661,      
+        CIQ048663,      
+        CIQ048664,      
+        CIQ048666,      
+        CIQ048667,      
+        CIQ048668,      
+        CIQ048669,      
+              
+        CIQ048671,      
+ CIQ048672,      
+        CIQ048673,      
+        CIQ048675,      
+        CIQ048676,      
+        CIQ048677,      
+        CIQ048679,      
+        CIQ048680,      
+        CIQ048681,      
+        CIQ048682,      
+        CIQ048683,      
+        CIQ048684,      
+        CIQ048685,  
+		CIQ049831,
+		CIQ049832,
+		CIQ049833,
+		CIQ049839,
+		CIQ049834,
+		CIQ049835,
+		CIQ049836,
+		CIQ049837,
+		CIQ049838,
+		CIQ049841,
+		CIQ049842,
+		CIQ049843,
+        FiscalYear,Convert(VARCHAR(100),'CASH FLOW FROM OPERATIONS') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048686 as EstimatesActual,      
+        3 as ARMISRowNumber,  FiscalQuarter, FiscalPeriodGAAP ,  RatingReviewStatus ,      
+        IncrementalLeaseCashFlowOper      
+        FROM #MnemonicsCollection_final      
+            
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN (CIQ048656, CIQ048657, CIQ048658, CIQ048659, CIQ048660, CIQ048661,      
+                 CIQ048663, CIQ048664, CIQ048666, CIQ048667, CIQ048668,      
+                 CIQ048669, CIQ048671, CIQ048672, CIQ048673, CIQ048675,      
+                 CIQ048676, CIQ048677, CIQ048679, CIQ048680, CIQ048681, CIQ048682, CIQ049831, CIQ049832, CIQ049833,
+				 CIQ049839, CIQ049834, CIQ049835, CIQ049836, CIQ049837, CIQ049838, CIQ049841, CIQ049842, CIQ049843,     
+                 CIQ048683, CIQ048684, CIQ048685, IncrementalLeaseCashFlowOper))       
+      AS sq_up      
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+   UPDATE #Cashflowfromoperations Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048686')      
+      
+  INSERT INTO #Cashflowfromoperations       
+    SELECT        
+     null as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  aa.[CIQ043927|DataPointvalueForFinl]
+      
+            FROM       
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+            FROM      
+      (SELECT       
+        CIQ048687,      
+        FiscalYear,Convert(VARCHAR(100),'CASH FLOW FROM OPERATIONS') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final      
+          
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048687))       
+      AS sq_up      
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+  INSERT INTO #Cashflowfromoperations       
+    SELECT      
+       null as [filename|DataPointName],      
+    aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as  [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+            FROM      
+      (SELECT        
+           CIQ048686,      
+        FiscalYear,Convert(VARCHAR(100),'CASH FLOW FROM OPERATIONS') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048686 as EstimatesActual, 2 as ARMISRowNumber      
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final       
+      )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048686))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+   UPDATE #Cashflowfromoperations Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048686') where Exchange = ''      
+      
+      
+  INSERT INTO #Cashflowfromoperations       
+    SELECT      
+     null as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  aa.[CIQ043927|DataPointvalueForFinl]      
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,     
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,   DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]     
+            FROM      
+      (SELECT        
+           CIQ048655,      
+        FiscalYear,Convert(VARCHAR(100),'CASH FLOW FROM OPERATIONS') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,      
+        1 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final       
+      )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048655))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+        
+        
+   --CashFlow end      
+  --select * from #Cashflowfromoperations      
+   --Dividends table start      
+         
+   INSERT INTO #Dividends       
+   SELECT        
+     bb.Caption as [filename|DataPointName],      
+     null as [CIQ044889|DataPointvalue],      
+     aa.[filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+     DateEnded,      
+     DateBegun,      
+     ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CIQ048689' THEN 1
+	 WHEN 'CIQ048690' THEN 2
+	 WHEN 'CIQ048691' THEN 3
+	 WHEN 'CIQ048692' THEN 4
+	 WHEN 'CIQ048693' THEN 5
+	 WHEN 'CIQ049844' THEN 6
+	 WHEN 'CIQ048694' THEN 7
+	 ELSE 8
+	 END,
+	 FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,      
+     CSDLastUpdate, '' as Exchange, ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]
+               FROM      
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],      
+     NULL AS [CIQ044889|DataPointvalue],      
+     SectionName [filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+       DateEnded,      
+       DateBegun,      
+       MagnitudeMultiplier,      
+       CSDLastUpdate, EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]         
+            
+     FROM      
+      (      
+        SELECT        
+        CIQ048689,      
+        CIQ048690,      
+        CIQ048691,      
+        CIQ048692,      
+        CIQ048693,      
+        CIQ048694,     
+		CIQ049844,
+        FiscalYear,Convert(VARCHAR(100),'DIVIDENDS') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048695 as EstimatesActual, 3 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final      
+            
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN (CIQ048689, CIQ048690, CIQ048691, CIQ048692, CIQ048693,      
+                 CIQ048694, CIQ049844))       
+      AS sq_up      
+        )aa       
+          
+   inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+   UPDATE #Dividends Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048695')      
+      
+   INSERT INTO #Dividends       
+    SELECT        
+      null as [filename|DataPointName],      
+      null as [CIQ044889|DataPointvalue]
+	  ,aa.[filename|SectionName]
+	  ,FiscalYear
+	  ,KeyCurrency
+	  ,DateEnded
+	  ,DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus , aa.[CIQ043927|DataPointvalueForFinl]    
+            FROM       
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]        
+            FROM      
+      (SELECT        
+              
+        CIQ048696,      
+        FiscalYear,Convert(VARCHAR(100),'DIVIDENDS') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final      
+            
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048696))       
+      AS sq_up      
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+  INSERT INTO #Dividends       
+    SELECT      
+       null as [filename|DataPointName],      
+    null as [CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, aa.[CIQ043927|DataPointvalueForFinl]      
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName], Null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]        
+            FROM      
+      (SELECT        
+           CIQ048695,      
+        FiscalYear,Convert(VARCHAR(100),'DIVIDENDS') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048695 as EstimatesActual, 2 as ARMISRowNumber      
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final       
+      )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048695))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+   UPDATE #Dividends Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048695') where Exchange = ''      
+      
+      
+   INSERT INTO #Dividends       
+   SELECT      
+     null as [filename|DataPointName],      
+     null as [CIQ044889|DataPointvalue],aa.[filename|SectionName],FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  aa.[CIQ043927|DataPointvalueForFinl]       
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],null as [CIQ044889|DataPointvalue],SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]          
+            FROM      
+      (SELECT        
+           CIQ048688,      
+        FiscalYear,Convert(VARCHAR(100),'DIVIDENDS') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, 1 as ARMISRowNumber      
+        , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final       
+      )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048688))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+        
+      
+   --Dividends table end      
+      
+   --select * from #Dividends      
+   --Capital expenditures table start      
+        
+  INSERT INTO #CapitalExpenditures       
+    SELECT        
+     bb.Caption as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],  
+	
+     aa.[filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+     DateEnded,      
+     DateBegun,      
+     ROW_NUMBER() OVER(ORDER BY CASE [Financials Pre-Adjusted|DataPointName]
+	 WHEN 'CIQ048698' THEN 1
+	 WHEN 'CIQ048699' THEN 2
+	 WHEN 'CIQ048701' THEN 3
+	 WHEN 'CIQ048702' THEN 4
+	 WHEN 'CIQ048703' THEN 5
+	 WHEN 'CIQ049845' THEN 6
+	 WHEN 'CIQ049846' THEN 7
+	 WHEN 'CIQ049847' THEN 8
+	 WHEN 'CIQ048704' THEN 9
+	 WHEN 'CIQ048705' THEN 10
+	 WHEN 'CIQ048706' THEN 11
+	 ELSE 12
+	 END,
+	 FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,      
+     CSDLastUpdate, '' as Exchange,      
+     ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  aa.[CIQ043927|DataPointvalueForFinl]      
+            FROM       
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],      
+     null as [CIQ044889|DataPointvalue],  
+	
+     SectionName [filename|SectionName],      
+     FiscalYear,      
+     KeyCurrency,      
+       DateEnded,      
+       DateBegun,      
+       MagnitudeMultiplier,      
+       CSDLastUpdate,      
+       EstimatesActual, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+            FROM      
+      (SELECT       
+        CIQ048698,      
+        CIQ048699,      
+        CIQ048701,      
+        CIQ048702,      
+        CIQ048703,      
+        CIQ048704,      
+        CIQ048705,      
+        CIQ048706,
+		CIQ049845,
+		CIQ049846,
+		CIQ049847,
+        FiscalYear,Convert(VARCHAR(100),'CAPITAL EXPENDITURES') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, CIQ048707 as EstimatesActual, 3 as ARMISRowNumber  , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final      
+            
+       )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048698, CIQ048699, CIQ048701, CIQ048702,      
+                 CIQ048703, CIQ048704, CIQ048705, CIQ048706, CIQ049845, CIQ049846, CIQ049847))       
+      AS sq_up      
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+          
+   UPDATE #CapitalExpenditures Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048707')      
+      
+  INSERT INTO #CapitalExpenditures       
+    SELECT        
+     null as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],
+	
+	 aa.[filename|SectionName],
+	 FiscalYear,
+	 KeyCurrency,
+	 DateEnded,
+	 DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,  aa.[CIQ043927|DataPointvalueForFinl]      
+            FROM       
+   (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],
+	 null as [CIQ044889|DataPointvalue], 
+	 
+	 SectionName [filename|SectionName],
+	 FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus , DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]     
+            FROM      
+      (SELECT        
+        CIQ048708,      
+      FiscalYear,Convert(VARCHAR(100),'CAPITAL EXPENDITURES') AS SectionName,DateEnded,DateBegun,KeyCurrency,      
+        MagnitudeMultiplier,CSDLastUpdate, 4 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus      
+        FROM #MnemonicsCollection_final      
+            
+       )       
+     AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048708))       
+      AS sq_up      
+        )aa       
+            
+        inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+  INSERT INTO #CapitalExpenditures       
+    SELECT      
+       null as [filename|DataPointName],      
+    aa.[CIQ044889|DataPointvalue],
+	
+	aa.[filename|SectionName],
+	FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+    ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+    MagnitudeMultiplier,CSDLastUpdate, '' as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus,
+	aa.[CIQ043927|DataPointvalueForFinl]
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],
+	 null as [CIQ044889|DataPointvalue], 	 
+	 SectionName [filename|SectionName],
+	 FiscalYear,      
+     KeyCurrency,DateEnded,DateBegun,MagnitudeMultiplier,CSDLastUpdate, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus
+	 , DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+            FROM      
+      (SELECT        
+           CIQ048707,      
+        FiscalYear,Convert(VARCHAR(100),'CAPITAL EXPENDITURES') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate, CIQ048707 as EstimatesActual, 2 as ARMISRowNumber      
+        , FiscalQuarter, FiscalPeriodGAAP  , RatingReviewStatus      
+        FROM #MnemonicsCollection_final       
+      )       
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048707))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+      
+   UPDATE #CapitalExpenditures Set Exchange = (Select bb.Caption from #LiveMetaItem bb Where bb.ItemName = 'CIQ048707') where Exchange = ''      
+      
+      
+  INSERT INTO #CapitalExpenditures       
+    SELECT      
+     null as [filename|DataPointName],      
+     aa.[CIQ044889|DataPointvalue],
+	 aa.[filename|SectionName],
+	 FiscalYear,KeyCurrency,DateEnded,DateBegun,      
+     ROW_NUMBER() OVER(PARTITION BY [Financials Pre-Adjusted|DataPointName] ORDER BY [Financials Pre-Adjusted|DataPointName],FiscalYear ASC) AS FormOrder,      
+     MagnitudeMultiplier,CSDLastUpdate, bb.Caption as Exchange, ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus, DataPointvalueForFinl as [CIQ043927|DataPointvalueForFinl]      
+           FROM       
+    (SELECT      
+     DataPointName [Financials Pre-Adjusted|DataPointName],
+	 null as  [CIQ044889|DataPointvalue],
+	 SectionName [filename|SectionName],FiscalYear,      
+     KeyCurrency,
+	 DateEnded,
+	 DateBegun,
+	 MagnitudeMultiplier,
+	 CSDLastUpdate, 
+	 ARMISRowNumber , 
+	 FiscalQuarter, 
+	 FiscalPeriodGAAP , 
+	 RatingReviewStatus,
+	 DataPointvalueForFinl 
+            FROM      
+      (SELECT        
+           CIQ048697,      
+        FiscalYear,Convert(VARCHAR(100),'CAPITAL EXPENDITURES') AS SectionName,DateEnded,DateBegun,KeyCurrency,MagnitudeMultiplier,CSDLastUpdate,      
+        1 as ARMISRowNumber , FiscalQuarter, FiscalPeriodGAAP , RatingReviewStatus   
+        FROM #MnemonicsCollection_final       
+      )   
+       AS sq_source      
+       UNPIVOT (      
+         DataPointvalueForFinl FOR DatapointName IN ( CIQ048697))       
+        AS sq_up      
+     )aa inner join #LiveMetaItem bb on aa.[Financials Pre-Adjusted|DataPointName]=bb.ItemName order by [Financials Pre-Adjusted|DataPointName], FiscalYear ASC      
+  --select * from #CapitalExpenditures      
+      
+   --Capital expenditure table end      
+      
+ SET NOCOUNT OFF      
+         
+ SELECT  [filename|DataPointName],      
+  [CIQ044889|DataPointvalue],  
+  [filename|SectionName],      
+  FiscalYear,      
+  KeyCurrency,      
+  DateEnded,      
+  DateBegun,      
+  FormOrder,      
+  MagnitudeMultiplier,      
+  CSDLastUpdate,      
+  Exchange,      
+  ARMISRowNumber,      
+  FiscalQuarter,      
+  FiscalPeriodGAAP,      
+  RatingReviewStatus,
+  [TreeID|SortBy], 
+  [CIQ043927|DataPointvalueForFinl]        
+  FROM       
+   (      
+  select *, 1 [TreeID|SortBy] from #Debt where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0) 
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)      
+   or (Exchange = 'Debt, Pre-Adjusted' or Exchange = 'Debt, Adjusted') and  ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))       
+      
+  UNION ALL      
+      
+      
+  select *, 2 [TreeID|SortBy] from #ShareholderEquity where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0)  
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)      
+   or (Exchange = 'Shareholders''' + ' Equity, Pre-Adjusted' or Exchange = 'Equity, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))        
+         
+      
+  UNION ALL      
+        
+   SELECT *, 3 [TreeID|SortBy] FROM #Revenues where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0) 
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)      
+   or (Exchange = 'Revenues, Pre-Adjusted' or Exchange = 'Revenues, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))      
+      
+  UNION ALL      
+        
+   SELECT *, 4 [TreeID|SortBy] FROM  #EBITDA where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0)
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)      
+   or (Exchange = 'EBITDA, Pre-Adjusted'  or Exchange = 'EBITDA, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))      
+       
+  UNION ALL      
+        
+   SELECT *, 5 [TreeID|SortBy] FROM  #OperatingIncome where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0)
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)       
+   or (Exchange = 'Operating Income, Pre-Adjusted' or Exchange = 'EBIT, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))        
+      
+  UNION ALL      
+        
+        
+   SELECT *, 6 [TreeID|SortBy] FROM  #InterestExpense where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0)
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)       
+   or (Exchange = 'Interest Expense, Pre-Adjusted' or Exchange = 'Interest Expense, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))      
+      
+  UNION ALL      
+        
+   SELECT *, 7 [TreeID|SortBy] FROM  #EBITDAFFO       
+   where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0)
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)      
+   or (Exchange = 'EBITDA, Adjusted' or Exchange = 'Funds From Operations, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))     
+       
+  UNION ALL      
+        
+   SELECT *, 8 [TreeID|SortBy] FROM  #Cashflowfromoperations where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0)
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)       
+   or (Exchange = 'Cash Flow from Operations, Pre-Adjusted' or Exchange = 'Cash Flow from Operations, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))       
+      
+  UNION ALL      
+       
+   SELECT *, 9 [TreeID|SortBy] FROM #Dividends where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0)
+   or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)       
+   or (Exchange = 'Dividends, Pre-Adjusted' or Exchange = 'Dividends, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))    
+         
+  UNION ALL      
+      
+        
+  SELECT *, 10 [TreeID|SortBy] FROM #CapitalExpenditures where ([CIQ044889|DataPointvalue] <> 0 OR [CIQ043927|DataPointvalueForFinl]<> 0) 
+  or ((Exchange = 'Total Adjustments' and [filename|DataPointName] is null)       
+   or (Exchange = 'Capital Expenditures, Pre-Adjusted' or Exchange = 'Capital Expenditures, Adjusted')  and ([CIQ044889|DataPointvalue] = 0  OR [CIQ043927|DataPointvalueForFinl] = 0))      
+       
+ ) aa      
+ order by [TreeID|SortBy], ARMISRowNumber      
+      
+        
+      
+  End
